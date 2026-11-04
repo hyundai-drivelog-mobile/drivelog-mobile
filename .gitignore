@@ -1,0 +1,21 @@
+﻿*.iml
+.gradle/
+.gradle-user/
+.kotlin/
+.idea/
+**/build/
+local.properties
+.DS_Store
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration, credentials, signing keys and runtime data
+.env
+.env.*
+!.env.example
+.run/
+*.jks
+*.keystore
+/data/
+*.log
