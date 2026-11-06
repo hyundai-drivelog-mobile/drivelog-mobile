@@ -2,10 +2,18 @@ package com.drivelog.mobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+object DriveColors {
+    val Black = Color(0xFF111111)
+    val White = Color(0xFFFFFFFF)
+    val Gray100 = Color(0xFFF5F5F5)
+    val Gray200 = Color(0xFFEAEAEA)
+    val Gray300 = Color(0xFFD5D5D5)
+    val Gray500 = Color(0xFF8A8A8A)
+    val Gray700 = Color(0xFF4A4A4A)
+    val Gray900 = Color(0xFF1E1E1E)
+    val SecondaryText = Color(0xFF666666)
+    val TertiaryText = Color(0xFF929292)
+    val ElevatedSurface = Color(0xFFFAFAFA)
+    val Border = Color(0xFFE6E6E6)
+    val SliderTrack = Color(0xFFE4E4E4)
+}
