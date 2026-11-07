@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.drivelog.mobile.R
@@ -20,7 +21,7 @@ import kotlinx.coroutines.delay
 @Composable fun SplashScreen(onFinished: () -> Unit) {
     LaunchedEffect(Unit) { delay(1700); onFinished() }
     Box(Modifier.fillMaxSize().background(DriveColors.Black)) {
-        Text(stringResource(R.string.brand), Modifier.align(Alignment.Center), style = MaterialTheme.typography.displayLarge, color = DriveColors.White)
+        Text(stringResource(R.string.brand), Modifier.align(Alignment.Center), style = MaterialTheme.typography.displayLarge.copy(fontStyle = FontStyle.Italic), color = DriveColors.White)
         LinearProgressIndicator(Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.35f).padding(bottom = 72.dp).height(2.dp),
             color = DriveColors.White, trackColor = DriveColors.Gray700)
     }

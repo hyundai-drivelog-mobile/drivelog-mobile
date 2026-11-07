@@ -56,7 +56,7 @@ import java.io.File
             }
             Spacer(Modifier.height(12.dp))
             if (recent == null) EmptyRecentDrive(onList) else RecentDriveHero(recent, photoFor(recent.id), photoVersion,
-                { onDetail(recent.id) }, { onEditor(recent.id) })
+                { onDetail(recent.id) })
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MoreFeature("추천 코스 공유", DriveIconType.ROUTE, Modifier.weight(1f), onLogin)
@@ -86,7 +86,7 @@ import java.io.File
 }
 
 @Composable private fun RecentDriveHero(record: RecordDto, photo: File?, photoVersion: Int,
-    onDetail: () -> Unit, onEditor: () -> Unit) {
+    onDetail: () -> Unit) {
     val image = remember(photo?.path, photoVersion) { photo?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
     Box(Modifier.fillMaxWidth().heightIn(min = 250.dp).height(270.dp).clip(RoundedCornerShape(20.dp))
         .background(Color(0xff303030)).clickable(onClick = onDetail)) {
@@ -105,15 +105,6 @@ import java.io.File
             Spacer(Modifier.height(5.dp))
             Text("${record.displayDistance()}  |  ${record.displayDuration()}",
                 style = MaterialTheme.typography.labelMedium, color = DriveColors.Gray200, maxLines = 2)
-            Spacer(Modifier.height(18.dp))
-            Surface(onClick = onEditor, color = DriveColors.White, shape = RoundedCornerShape(12.dp)) {
-                Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("카드 만들기", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = DriveColors.Black)
-                        Text("→", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = DriveColors.Black)
-                    }
-                }
-            }
         }
     }
 }

@@ -23,7 +23,7 @@ object RecordCardRenderer {
         val stat = template == "STAT"
         val routeFocus = template == "ROUTE"
         val dark = journal && o.optString("tone") == "mono-dark"
-        val ink = Color.WHITE
+        var ink = Color.WHITE
         fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, width: Float = 968f,
                  align: Paint.Align = Paint.Align.LEFT) {
             p.shader = null; p.colorFilter = null; p.color = ink; p.textSize = size
@@ -58,40 +58,53 @@ object RecordCardRenderer {
             if (matrix != null) p.colorFilter = ColorMatrixColorFilter(matrix)
             c.save(); c.clipRect(rect); c.drawBitmap(bitmap,null,RectF(x,y,x+placement.width,y+placement.height),p); c.restore(); p.colorFilter=null
         } finally { bitmap.recycle() }
-        val distance=r.distanceKm?.let { "%.1f km".format(Locale.KOREA,it) } ?: "거리 정보 없음"
+        fun panel(color: Int, l: Float, t: Float, r: Float, b: Float) {
+            p.color = color; p.shader = null; p.colorFilter = null
+            c.drawRect(l, t, r, b, p)
+        }
+        when {
+            journal -> { panel(Color.rgb(247,244,236),0f,885f,1080f,1440f); ink=Color.rgb(25,25,25) }
+            split -> { panel(Color.rgb(17,17,17),545f,0f,1080f,1440f); panel(Color.WHITE,545f,0f,552f,1440f) }
+            stat -> panel(Color.argb(225,15,15,15),36f,695f,1044f,1420f)
+            routeFocus -> panel(Color.argb(210,8,13,19),0f,0f,1080f,1440f)
+            else -> panel(Color.argb(145,0,0,0),0f,1050f,1080f,1440f)
+        }
+        p.color = if (journal) Color.WHITE else ink
+        p.textSize = 44f; p.textAlign = Paint.Align.LEFT
+        p.typeface = Typeface.create(Typeface.DEFAULT,Typeface.BOLD_ITALIC)
+        c.drawText("DRIVELOG",56f,92f,p)
+        val distance=r.distanceKm?.let { "%.1f km".format(Locale.KOREA,it) } ?: "정보 없음"
         val label=when(r.distanceSource) { "VEHICLE" -> "차량 주행거리"; "GPS_ESTIMATED" -> "추정 거리"; else -> "거리" }
         val duration="${r.elapsedSeconds/60}분 ${r.elapsedSeconds%60}초"
         val date=SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(r.startedAtMillis))
-        val titleY = when { journal -> 180f; split -> 760f; stat -> 210f; routeFocus -> 190f; else -> 1130f }
-        if (o.optBoolean("showPlace",true)) text(title,56f,titleY,if(stat) 94f else 76f,true)
-        val metricSize = 46f
-        p.textSize = metricSize
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        val halfTime = p.measureText(r.displayDuration()) / 2f
-        val leftDivider = 540f - halfTime - 24f
-        val rightDivider = 540f + halfTime + 24f
-        if (o.optBoolean("showTime",true)) text(r.displayDuration(),540f,1300f,metricSize,true,340f,Paint.Align.CENTER)
-        if (o.optBoolean("showDistance",true)) text(distance,leftDivider-24f,1300f,metricSize,true,leftDivider-80f,Paint.Align.RIGHT)
-        if (o.optBoolean("showDate",true)) text(date,rightDivider+24f,1300f,metricSize,true,1000f-rightDivider)
-        if (o.optBoolean("showDistance",true) && o.optBoolean("showTime",true)) text("|",leftDivider,1300f,38f,false,30f,Paint.Align.CENTER)
-        if (o.optBoolean("showTime",true) && o.optBoolean("showDate",true)) text("|",rightDivider,1300f,38f,false,30f,Paint.Align.CENTER)
+        if (o.optBoolean("showDate",true)) {
+            val saved = ink; if (journal) ink = Color.WHITE
+            text(date,1024f,90f,30f,false,380f,Paint.Align.RIGHT); ink = saved
+        }
+        val titleY = when { journal -> 1025f; split -> 235f; stat -> 840f; routeFocus -> 265f; else -> 1150f }
+        val titleX = if (split) 595f else 56f
+        if (o.optBoolean("showPlace",true)) text(title,titleX,titleY,if(split) 60f else 76f,true,if(split) 430f else 968f)
+        if (journal) { text("DRIVE JOURNAL",56f,950f,25f,true); panel(ink,56f,1065f,1024f,1068f) }
+        if (split) text("THE DRIVE / 01",595f,155f,25f,true)
+        if (stat) text("DRIVE DATA",56f,760f,27f,true)
+        if (routeFocus) text("THE ROUTE",56f,170f,30f,true)
         if (o.optBoolean("showRoute",true)) {
             var route=r.route.filter { it.latitude.isFinite() && it.longitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude in -180.0..180.0 }
             if (o.optBoolean("trimEnds",true) && route.size>=12) { val cut=max(1,(route.size*.1).roundToInt()); route=route.drop(cut).dropLast(cut) }
             val box=when {
-                journal -> RectF(70f,350f,1010f,950f)
-                split -> RectF(70f,840f,1010f,1150f)
-                stat -> RectF(70f,300f,1010f,770f)
-                routeFocus -> RectF(70f,240f,1010f,1010f)
-                else -> RectF(70f,340f,1010f,960f)
+                journal -> RectF(650f,1080f,1010f,1190f)
+                split -> RectF(595f,360f,1020f,1030f)
+                stat -> RectF(650f,910f,1010f,1120f)
+                routeFocus -> RectF(100f,350f,980f,1080f)
+                else -> RectF(100f,180f,980f,990f)
             }
-            if(route.size<2) text("경로 정보 부족",box.left,box.centerY(),26f,false,box.width()) else {
+            if(route.size<2) { if (routeFocus) text("경로 정보 없음",box.centerX(),box.centerY(),28f,false,box.width(),Paint.Align.CENTER) } else {
                 val k=cos(Math.toRadians(route.map { it.latitude }.average()))
                 val xs=route.map { it.longitude*k }; val ys=route.map { -it.latitude }
                 val minX=xs.min(); val minY=ys.min(); val dx=max(1e-7,xs.max()-minX); val dy=max(1e-7,ys.max()-minY)
                 val scale=min(box.width()/dx,box.height()/dy)
                 val ox=box.left+(box.width()-dx*scale)/2; val oy=box.top+(box.height()-dy*scale)/2
-                p.color=ink; p.strokeWidth=if(journal) 6f else 8f; p.strokeCap=Paint.Cap.ROUND
+                p.color=ink; p.strokeWidth=if(routeFocus) 14f else if(journal) 5f else 8f; p.strokeCap=Paint.Cap.ROUND
                 for(i in 1 until route.size) {
                     val gap=route[i].epochMillis-route[i-1].epochMillis
                     if(gap<0) continue
@@ -101,7 +114,27 @@ object RecordCardRenderer {
                 p.pathEffect=null
             }
         }
-        if (o.optBoolean("showEfficiency", false)) text("연비/전비 정보 없음",56f,1300f,23f)
+        val metrics = listOfNotNull(
+            if (o.optBoolean("showDistance",true)) Triple("distance","거리",distance) else null,
+            if (o.optBoolean("showTime",true)) Triple("time","시간",r.displayDuration()) else null,
+            Triple("fuel","연비","정보 없음")
+        )
+        val left = if (split) 580f else 80f
+        val right = 1000f
+        val baseline = if (journal) 1280f else 1300f
+        metrics.forEachIndexed { index, metric ->
+            val center = left+(right-left)*(index+.5f)/metrics.size
+            val y = baseline-85f
+            p.color=ink; p.style=Paint.Style.STROKE; p.strokeWidth=4f; p.strokeCap=Paint.Cap.ROUND
+            when(metric.first) {
+                "distance" -> { c.drawRoundRect(center-22f,y-14f,center+22f,y+10f,5f,5f,p); c.drawCircle(center-12f,y+13f,5f,p); c.drawCircle(center+12f,y+13f,5f,p) }
+                "time" -> { c.drawCircle(center,y,22f,p); c.drawLine(center,y,center,y-13f,p); c.drawLine(center,y,center+11f,y+6f,p) }
+                else -> { c.drawRoundRect(center-16f,y-22f,center+12f,y+22f,4f,4f,p); c.drawLine(center-16f,y-6f,center+12f,y-6f,p) }
+            }
+            p.style=Paint.Style.FILL
+            text(metric.second,center,baseline-24f,25f,false,210f,Paint.Align.CENTER)
+            text(metric.third,center,baseline+28f,if(split) 33f else 43f,true,(right-left)/metrics.size-25f,Paint.Align.CENTER)
+        }
         val note=listOfNotNull(if(r.status=="PARTIAL") "불완전한 기록" else null,if(r.simulated) "시뮬레이션 데이터" else null).joinToString(" · ")
         text(note,50f,1380f,22f)
         return result

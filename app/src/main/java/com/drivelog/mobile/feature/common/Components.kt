@@ -73,16 +73,16 @@ import com.drivelog.mobile.ui.theme.DriveColors
 }
 
 @Composable fun RecordCard(record: RecordDto, photo: java.io.File? = null, photoVersion: Int = 0, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 192.dp).border(1.dp, DriveColors.Gray200, RoundedCornerShape(DriveDimens.CardRadius))
-        .clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        DrivePhoto(photo, photoVersion, Modifier.size(100.dp,128.dp))
-        Spacer(Modifier.width(24.dp))
+    Row(Modifier.fillMaxWidth().height(104.dp).border(1.dp, DriveColors.Gray200, RoundedCornerShape(DriveDimens.CardRadius))
+        .clickable(onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        DrivePhoto(photo, photoVersion, Modifier.size(78.dp,82.dp))
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(record.placeName, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(3.dp))
             Text(record.displayDate(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray700)
-            Spacer(Modifier.height(12.dp))
-            Text("${record.displayDistance()} | ${record.displayDuration()}", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(5.dp))
+            Text("${record.displayDistance()}  ${record.displayDuration()}", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
         }
     }
 }
