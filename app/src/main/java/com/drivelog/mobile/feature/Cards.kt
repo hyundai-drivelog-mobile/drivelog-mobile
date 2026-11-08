@@ -24,6 +24,7 @@ object Cards {
         check(temp.length() <= 15 * 1024 * 1024)
         check(temp.renameTo(file))
     }
-    fun render(record: RecordDto, photo: File, title: String, settings: JSONObject): Bitmap =
-        RecordCardRenderer.render(record, photo, title, settings)
+    fun render(record: RecordDto, photo: File, title: String, settings: JSONObject,
+        mapBackground: Bitmap? = null, blackTemplate: Boolean = false): Bitmap =
+        RecordCardRenderer.render(record, photo, title, settings, mapBackground, blackTemplate)
 }

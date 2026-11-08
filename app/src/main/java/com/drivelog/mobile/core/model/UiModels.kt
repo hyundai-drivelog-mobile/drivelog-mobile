@@ -13,7 +13,7 @@ enum class CardFilter(val label: String, val tone: String) {
 }
 
 enum class CardLayout(val label: String) {
-    PHOTO("PHOTO"), JOURNAL("JOURNAL"), SPLIT("SPLIT"), STAT("STAT"), ROUTE("ROUTE")
+    PHOTO("MINIMAL"), JOURNAL("JOURNAL"), SPLIT("FRAME"), STAT("FOCUS"), ROUTE("ROUTE")
 }
 
 data class CardDraft(
@@ -26,6 +26,7 @@ data class CardDraft(
     val showDate: Boolean = true,
     val showPlace: Boolean = true,
     val showEfficiency: Boolean = false,
+    val blackTemplate: Boolean = false,
     val trimEnds: Boolean = true,
     val zoom: Float = 1f,
     val panX: Float = 0f,
