@@ -50,11 +50,11 @@ import kotlinx.coroutines.withContext
     val rendered by produceState<ImageBitmap?>(null, record.id, draft, photoVersion, photoExists) {
         val map = if (!photoExists) {
             val points = cardMapPoints(record, draft.showRoute && draft.trimEnds)
-            if (points.size >= 2) mapCache.load(record, points, 900, 1200, includeRoute = draft.showRoute) else null
+            if (points.size >= 2) mapCache.load(record, points, 900, 1200, includeRoute = false) else null
         } else null
         value = withContext(Dispatchers.IO) {
             Cards.render(record, source, draft.title.ifBlank { record.placeName }, draft.toSettings(), map,
-                draft.blackElements).asImageBitmap()
+                draft.blackTemplate).asImageBitmap()
         }
     }
     val currentDraft by rememberUpdatedState(draft)
@@ -81,11 +81,9 @@ import kotlinx.coroutines.withContext
             } else Modifier
             Box(Modifier.fillMaxSize().then(transform).pointerInput(photoExists) {
                 detectTapGestures { position ->
-                    val element = defaultCardElementAt(position, size.width, size.height, currentDraft)
-                    if (element != null && currentChange != null) {
-                        val colors = currentDraft.blackElements
-                        currentChange?.invoke(currentDraft.copy(blackElements =
-                            if (element in colors) colors - element else colors + element))
+                    if (isTemplateElementAt(position, size.width, size.height, currentDraft, photoExists)
+                        && currentChange != null) {
+                        currentChange?.invoke(currentDraft.copy(blackTemplate = !currentDraft.blackTemplate))
                     } else if (!photoExists) currentPhotoClick?.invoke()
                 }
             })
@@ -93,20 +91,43 @@ import kotlinx.coroutines.withContext
     }
 }
 
-private fun defaultCardElementAt(position: Offset, width: Int, height: Int, draft: CardDraft): CardElement? {
-    if (draft.layout != CardLayout.PHOTO || width <= 0 || height <= 0) return null
+private fun isTemplateElementAt(position: Offset, width: Int, height: Int,
+    draft: CardDraft, photoExists: Boolean): Boolean {
+    if (width <= 0 || height <= 0) return false
     val x = position.x * 1080f / width
     val y = position.y * 1440f / height
-    if (x in 35f..370f && y in 35f..130f) return CardElement.BRAND
-    if (draft.showDate && x in 690f..1045f && y in 35f..125f) return CardElement.DATE
-    if (draft.showPlace && x in 35f..1045f && y in 1050f..1180f) return CardElement.PLACE
-    if (x !in 80f..1000f || y !in 1180f..1350f) return null
-    val metrics = buildList {
-        if (draft.showDistance) add(CardElement.DISTANCE)
-        if (draft.showTime) add(CardElement.TIME)
-        add(CardElement.EFFICIENCY)
+    if (x in 35f..370f && y in 35f..130f) return true
+    if (draft.showDate && x in 690f..1045f && y in 35f..125f) return true
+    val titleArea = when (draft.layout) {
+        CardLayout.PHOTO -> x in 35f..1045f && y in 975f..1160f
+        CardLayout.JOURNAL -> x in 35f..1045f && y in 1000f..1140f
+        CardLayout.SPLIT -> x in 35f..1045f && y in 1040f..1170f
+        CardLayout.STAT -> x in 100f..1045f && y in 50f..155f
+        CardLayout.ROUTE -> false
     }
-    return metrics[((x - 80f) / 920f * metrics.size).toInt().coerceIn(0, metrics.lastIndex)]
+    if (draft.showPlace && titleArea) return true
+    val labelArea = when (draft.layout) {
+        CardLayout.PHOTO -> false
+        CardLayout.JOURNAL -> x in 35f..650f && y in 640f..975f
+        CardLayout.SPLIT -> x in 35f..650f && y in 965f..1060f
+        CardLayout.STAT -> false
+        CardLayout.ROUTE -> false
+    }
+    if (labelArea) return true
+    if (draft.layout == CardLayout.SPLIT && y in 175f..275f &&
+        (x in 55f..180f || x in 900f..1025f)) return true
+    val metricArea = when (draft.layout) {
+        CardLayout.PHOTO, CardLayout.ROUTE -> x in 35f..1045f && y in 1160f..1370f
+        CardLayout.STAT -> x in 35f..1045f && y in 910f..1360f
+        CardLayout.JOURNAL, CardLayout.SPLIT -> x in 35f..1045f && y in 1200f..1360f
+    }
+    if (metricArea) return true
+    if (!draft.showRoute) return false
+    return when (draft.layout) {
+        CardLayout.PHOTO -> false
+        CardLayout.JOURNAL, CardLayout.SPLIT, CardLayout.STAT -> false
+        CardLayout.ROUTE -> x in 100f..980f && y in 300f..1020f
+    }
 }
 
 @Composable fun PhotoFilterThumbnail(photo: File?, photoVersion: Int, filter: CardFilter,

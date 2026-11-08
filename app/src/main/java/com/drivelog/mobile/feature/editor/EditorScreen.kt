@@ -115,11 +115,12 @@ enum class EditorTab { FILTER, LAYOUT, INFO }
         Text("카드 레이아웃", Modifier.padding(horizontal = DriveDimens.Page), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(10.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = DriveDimens.Page), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            items(CardLayout.entries) { layout ->
+            items(listOf(CardLayout.PHOTO, CardLayout.STAT, CardLayout.ROUTE, CardLayout.JOURNAL, CardLayout.SPLIT)) { layout ->
                 Column(Modifier.clickable { onDraft(draft.copy(layout = layout)) }, horizontalAlignment = Alignment.CenterHorizontally) {
                     LayoutThumbnail(layout, record, photo, photoVersion, Modifier.width(72.dp)
                         .border(if (draft.layout == layout) 2.dp else 1.dp,
-                            if (draft.layout == layout) DriveColors.Black else DriveColors.Border, RoundedCornerShape(9.dp)))
+                            if (draft.layout == layout) DriveColors.Black else DriveColors.Border, RoundedCornerShape(9.dp)),
+                        blackTemplate = draft.blackTemplate)
                     Spacer(Modifier.height(7.dp))
                     Text(layout.label, style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = if (draft.layout == layout) FontWeight.SemiBold else FontWeight.Medium),

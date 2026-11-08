@@ -65,7 +65,7 @@ private object Route {
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
         val record = records.find { it.id == activeId }
         if (uri != null && record != null) {
-            model.export(uri, record, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackElements)
+            model.export(uri, record, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate)
         }
     }
     fun pick(id: String) {
@@ -150,7 +150,7 @@ private object Route {
                 val record = records.find { it.id == entry.arguments?.getString("id") }
                 if (record != null) EditorScreen(record, draft, { draft = it }, model.photo(record.id), model.photoVersion,
                     { nav.popBackStack() }, { pick(record.id) }, { nav.navigate(Route.preview(record.id)) },
-                    { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackElements); scope.launch { snackbar.showSnackbar("편집 설정을 임시 저장했어요") } },
+                    { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate); scope.launch { snackbar.showSnackbar("편집 설정을 임시 저장했어요") } },
                     onSave = { if (model.photo(record.id).exists() || cardMapPoints(record, false).size >= 2) {
                         activeId = record.id; exporter.launch("DRIVELOG-${record.id}.png")
                     } else pick(record.id) })
@@ -159,8 +159,8 @@ private object Route {
                 val record = records.find { it.id == entry.arguments?.getString("id") }
                 if (record != null) FinalPreviewScreen(record, draft, model.photo(record.id), model.photoVersion, saved,
                     { nav.popBackStack() }, { activeId = record.id; exporter.launch("DRIVELOG-${record.id}.png") },
-                    { if (demo || !model.photo(record.id).exists()) { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackElements); scope.launch { snackbar.showSnackbar("설정을 저장했어요") } }
-                      else model.save(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackElements) })
+                    { if (demo || !model.photo(record.id).exists()) { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate); scope.launch { snackbar.showSnackbar("설정을 저장했어요") } }
+                      else model.save(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate) })
             }
         }
     }
@@ -175,10 +175,6 @@ private object Route {
 private fun cardDraftFrom(stored: JSONObject, placeName: String, recordTitle: String?, cardJson: String?): CardDraft {
     val settings = stored.optJSONObject("settings") ?: Cards.settings(cardJson)
     val crop = settings.optJSONObject("crop") ?: JSONObject()
-    val savedColors = stored.optJSONArray("blackElements")
-    val blackElements = (0 until (savedColors?.length() ?: 0)).mapNotNull { index ->
-        CardElement.entries.find { it.name == savedColors?.optString(index) }
-    }.toSet()
     return CardDraft(
         title = stored.optString("title", recordTitle ?: placeName),
         filter = CardFilter.entries.find { it.tone == settings.optString("tone", "color") } ?: CardFilter.ORIGINAL,
@@ -186,7 +182,7 @@ private fun cardDraftFrom(stored: JSONObject, placeName: String, recordTitle: St
         showRoute = settings.optBoolean("showRoute", true), showDistance = settings.optBoolean("showDistance", true),
         showTime = settings.optBoolean("showTime", true), showDate = settings.optBoolean("showDate", true),
         showPlace = settings.optBoolean("showPlace", true), showEfficiency = settings.optBoolean("showEfficiency", false),
-        blackElements = blackElements,
+        blackTemplate = stored.optBoolean("blackTemplate", false),
         trimEnds = settings.optBoolean("trimEnds", true), zoom = crop.optDouble("zoom", 1.0).toFloat().coerceIn(1f, 3f),
         panX = crop.optDouble("x", 0.0).toFloat().coerceIn(-1f, 1f),
         panY = crop.optDouble("y", 0.0).toFloat().coerceIn(-1f, 1f)

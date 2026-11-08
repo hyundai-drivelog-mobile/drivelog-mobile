@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
     val rendered by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, record.id, draft, photoVersion) {
         value = if (photo?.exists() == true) withContext(Dispatchers.IO) {
             runCatching { Cards.render(record, photo, draft.title.ifBlank { record.placeName }, draft.toSettings(),
-                blackElements = draft.blackElements).asImageBitmap() }.getOrNull()
+                blackTemplate = draft.blackTemplate).asImageBitmap() }.getOrNull()
         } else null
     }
     Column(Modifier.fillMaxSize()) {
