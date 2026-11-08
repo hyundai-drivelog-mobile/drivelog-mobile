@@ -19,6 +19,7 @@ import com.drivelog.mobile.core.model.*
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.common.*
 import com.drivelog.mobile.feature.Cards
+import com.drivelog.mobile.feature.journey.cardMapPoints
 import com.drivelog.mobile.ui.theme.*
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,8 @@ import kotlinx.coroutines.withContext
     saved: Boolean, onBack: () -> Unit, onSavePng: () -> Unit, onSaveSettings: () -> Unit) {
     val rendered by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, record.id, draft, photoVersion) {
         value = if (photo?.exists() == true) withContext(Dispatchers.IO) {
-            runCatching { Cards.render(record, photo, draft.title.ifBlank { record.placeName }, draft.toSettings()).asImageBitmap() }.getOrNull()
+            runCatching { Cards.render(record, photo, draft.title.ifBlank { record.placeName }, draft.toSettings(),
+                blackElements = draft.blackElements).asImageBitmap() }.getOrNull()
         } else null
     }
     Column(Modifier.fillMaxSize()) {
@@ -45,7 +47,8 @@ import kotlinx.coroutines.withContext
             Spacer(Modifier.height(24.dp))
         }
         Column(Modifier.padding(DriveDimens.Page)) {
-            DriveButton(stringResource(R.string.save_png), onSavePng, Modifier.fillMaxWidth(), photo?.exists() == true)
+            DriveButton(stringResource(R.string.save_png), onSavePng, Modifier.fillMaxWidth(),
+                photo?.exists() == true || cardMapPoints(record, false).size >= 2)
             Spacer(Modifier.height(10.dp))
             DriveOutlineButton(stringResource(R.string.keep_editing), onBack, Modifier.fillMaxWidth())
             DriveGhostButton(stringResource(R.string.save_settings), onSaveSettings, Modifier.fillMaxWidth())

@@ -10,10 +10,15 @@ import androidx.lifecycle.viewModelScope
 import com.drivelog.mobile.BuildConfig
 import com.drivelog.mobile.MainActivity
 import com.drivelog.mobile.data.*
+import com.drivelog.mobile.feature.common.DrivePhotoAsset
+import com.drivelog.mobile.feature.journey.RecentDriveMapCache
+import com.drivelog.mobile.feature.journey.cardMapPoints
+import com.drivelog.mobile.core.model.CardElement
 import kotlinx.coroutines.*
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONObject
+import org.json.JSONArray
 
 class MobileModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -33,8 +38,9 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     fun photo(id: String) = File(directory(), safeId(id) + ".jpg")
     private fun safeId(id: String) = MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).joinToString("") { "%02x".format(it) }
     fun draft(id: String): JSONObject = runCatching { JSONObject(File(directory(), safeId(id) + ".json").readText()) }.getOrDefault(JSONObject())
-    fun saveDraft(id: String, title: String, settings: JSONObject) {
-        File(directory(), safeId(id) + ".json").writeText(JSONObject().put("title", title).put("settings", settings).toString())
+    fun saveDraft(id: String, title: String, settings: JSONObject, blackElements: Set<CardElement> = emptySet()) {
+        File(directory(), safeId(id) + ".json").writeText(JSONObject().put("title", title).put("settings", settings)
+            .put("blackElements", JSONArray(blackElements.map { it.name })).toString())
     }
     private fun task(block: suspend () -> Unit) {
         if (busy) return
@@ -79,17 +85,25 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     fun importPhoto(id: String, uri: Uri) = task {
         withContext(Dispatchers.IO) { Cards.importPhoto(context, uri, photo(id)) }; photoVersion++
     }
-    fun save(id: String, title: String, settings: JSONObject) = task {
+    fun save(id: String, title: String, settings: JSONObject, blackElements: Set<CardElement> = emptySet()) = task {
         withContext(Dispatchers.IO) {
-            saveDraft(id, title, settings)
+            saveDraft(id, title, settings, blackElements)
             api.uploadPhoto(id, photo(id).readBytes(), "image/jpeg")
             api.saveCard(id, title, settings.toString())
         }
         syncNow(); message = "사진과 카드 설정을 저장했습니다."
     }
-    fun export(uri: Uri, record: RecordDto, title: String, settings: JSONObject) = task {
+    fun export(uri: Uri, record: RecordDto, title: String, settings: JSONObject,
+        blackElements: Set<CardElement> = emptySet()) = task {
+        val selectedPhoto = photo(record.id)
+        val map = if (!selectedPhoto.exists()) {
+            val points = cardMapPoints(record, settings.optBoolean("showRoute", true) && settings.optBoolean("trimEnds", true))
+            if (points.size >= 2) RecentDriveMapCache.shared(context).load(record, points, 900, 1200,
+                includeRoute = settings.optBoolean("showRoute", true)) else null
+        } else null
         withContext(Dispatchers.IO) {
-            val bitmap = Cards.render(record, photo(record.id), title, settings)
+            val source = if (selectedPhoto.exists()) selectedPhoto else DrivePhotoAsset.file(context)
+            val bitmap = Cards.render(record, source, title, settings, map, blackElements)
             try { context.contentResolver.openOutputStream(uri)?.use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) } ?: error("저장 실패") }
             finally { bitmap.recycle() }
         }

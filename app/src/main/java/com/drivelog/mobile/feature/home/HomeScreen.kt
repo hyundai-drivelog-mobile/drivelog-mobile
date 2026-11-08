@@ -1,6 +1,5 @@
 package com.drivelog.mobile.feature.home
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,8 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,6 +25,8 @@ import com.drivelog.mobile.core.model.DemoJourneys
 import com.drivelog.mobile.core.util.*
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.common.*
+import com.drivelog.mobile.feature.journey.DriveRouteMapImage
+import com.drivelog.mobile.feature.journey.RecentDriveMapCache
 import com.drivelog.mobile.ui.theme.*
 import java.io.File
 
@@ -87,16 +87,13 @@ import java.io.File
 
 @Composable private fun RecentDriveHero(record: RecordDto, photo: File?, photoVersion: Int,
     onDetail: () -> Unit) {
-    val image = remember(photo?.path, photoVersion) { photo?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
+    val context = LocalContext.current
+    val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
     Box(Modifier.fillMaxWidth().heightIn(min = 250.dp).height(270.dp).clip(RoundedCornerShape(20.dp))
         .background(Color(0xff303030)).clickable(onClick = onDetail)) {
-        if (image != null) {
-            Image(image, "선택한 주행 사진", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .08f),
-                Color.Black.copy(alpha = .13f), Color.Black.copy(alpha = .83f)))))
-        } else {
-            DrivePhoto(modifier = Modifier.fillMaxWidth().height(100.dp).align(Alignment.TopCenter))
-        }
+        DriveRouteMapImage(record, mapCache, photo, photoVersion, Modifier.fillMaxSize(), creditAlignment = Alignment.TopStart)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .08f),
+            Color.Black.copy(alpha = .13f), Color.Black.copy(alpha = .83f)))))
         Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp)) {
             Text(record.displayDate(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray200)
             Spacer(Modifier.height(4.dp))

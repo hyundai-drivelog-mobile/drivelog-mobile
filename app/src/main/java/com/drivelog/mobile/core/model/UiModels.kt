@@ -16,6 +16,8 @@ enum class CardLayout(val label: String) {
     PHOTO("PHOTO"), JOURNAL("JOURNAL"), SPLIT("SPLIT"), STAT("STAT"), ROUTE("ROUTE")
 }
 
+enum class CardElement { BRAND, DATE, PLACE, DISTANCE, TIME, EFFICIENCY }
+
 data class CardDraft(
     val title: String = "",
     val filter: CardFilter = CardFilter.ORIGINAL,
@@ -26,6 +28,7 @@ data class CardDraft(
     val showDate: Boolean = true,
     val showPlace: Boolean = true,
     val showEfficiency: Boolean = false,
+    val blackElements: Set<CardElement> = emptySet(),
     val trimEnds: Boolean = true,
     val zoom: Float = 1f,
     val panX: Float = 0f,

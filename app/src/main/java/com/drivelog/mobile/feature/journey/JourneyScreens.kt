@@ -1,5 +1,8 @@
 package com.drivelog.mobile.feature.journey
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -151,10 +156,15 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             drawLine(DriveColors.Gray200, Offset(x, 0f), Offset(x, size.height - 18.dp.toPx()), strokeWidth = .5.dp.toPx())
         }
     }
-    else YearDistanceChart(byYear.mapValues { (_, yearly) -> yearly.sumOf { it.distanceKm ?: 0.0 } })
+    else YearDistanceChart(byYear.mapValues { (_, yearly) -> yearly.sumOf { it.distanceKm ?: 0.0 } }, period, anchor)
 }
 
-@Composable private fun YearDistanceChart(values: Map<Int, Double>) {
+@Composable private fun YearDistanceChart(values: Map<Int, Double>, period: DrivePeriod, anchor: Long) {
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(period, anchor, values) {
+        reveal.snapTo(0f)
+        reveal.animateTo(1f, animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing))
+    }
     val maxKm = values.values.maxOrNull() ?: 0.0
     val step = (ceil(maxKm / 50.0) * 10.0).coerceAtLeast(10.0)
     val chartMax = step * 5.0
@@ -163,7 +173,7 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             Text(year.toString(), Modifier.width(43.dp), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray500)
             Spacer(Modifier.width(8.dp))
             BoxWithConstraints(Modifier.weight(1f).height(20.dp)) {
-                val fraction = (km / chartMax).toFloat().coerceIn(0f, 1f)
+                val fraction = (km / chartMax).toFloat().coerceIn(0f, 1f) * reveal.value
                 val plotWidth = maxWidth - 18.dp
                 Canvas(Modifier.fillMaxSize()) {
                     val chartWidth = size.width - 18.dp.toPx()
@@ -241,11 +251,12 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
     }
 }
 
-@Composable private fun DashboardDriveCard(record: RecordDto, photo: java.io.File?, photoVersion: Int, onClick: () -> Unit) {
+@Composable private fun DashboardDriveCard(record: RecordDto, photo: java.io.File?, photoVersion: Int,
+    mapCache: RecentDriveMapCache, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().border(.5.dp, DriveColors.Gray300, RoundedCornerShape(16.dp))
         .background(DriveColors.White, RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().height(104.dp).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            DrivePhoto(photo, photoVersion, Modifier.size(76.dp, 82.dp))
+            RecentDriveMapThumbnail(record, mapCache, photo, photoVersion, Modifier.size(76.dp, 82.dp))
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)) {
                 Text(record.displayDate(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray500)
@@ -321,6 +332,8 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
 }
 
 @Composable fun JourneyListScreen(records: List<RecordDto>, onBack: () -> Unit, onDetail: (String) -> Unit, onRefresh: () -> Unit, photoFor: (String) -> java.io.File? = { null }, photoVersion: Int = 0) {
+    val context = LocalContext.current
+    val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
     var selectedPeriod by rememberSaveable { mutableStateOf(DrivePeriod.ALL) }
     val latestAnchor = records.maxOfOrNull { it.startedAtMillis } ?: System.currentTimeMillis()
     var selectedAnchor by rememberSaveable(latestAnchor) { mutableLongStateOf(latestAnchor) }
@@ -369,7 +382,7 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
                 },
                     style = MaterialTheme.typography.bodyMedium, color = DriveColors.Gray700)
             } else visibleRecords.forEach { record ->
-                DashboardDriveCard(record, photoFor(record.id), photoVersion) { onDetail(record.id) }
+                DashboardDriveCard(record, photoFor(record.id), photoVersion, mapCache) { onDetail(record.id) }
                 Spacer(Modifier.height(10.dp))
             }
             Spacer(Modifier.height(30.dp))
@@ -399,6 +412,8 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
 }
 
 @Composable fun JourneyDetailScreen(record: RecordDto, hasPhoto: Boolean, onBack: () -> Unit, onPhoto: () -> Unit, onEditor: () -> Unit) {
+    val context = LocalContext.current
+    val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
     Column(Modifier.fillMaxSize()) {
         ScreenTopBar("드라이브 기록", onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = DriveDimens.Page)) {
@@ -408,7 +423,8 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             Text(record.placeName, style = MaterialTheme.typography.displayLarge)
             Spacer(Modifier.height(14.dp))
             Spacer(Modifier.height(24.dp))
-            RoutePreview(record.route, Modifier.fillMaxWidth().height(220.dp))
+            DriveRouteMapImage(record, mapCache, null, 0,
+                Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(22.dp)), showEmptyMessage = true)
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 JourneyMetric(R.drawable.ic_car, "거리", record.displayDistance(), Modifier.weight(1f))

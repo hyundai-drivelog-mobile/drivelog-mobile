@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.*
 import android.net.Uri
 import com.drivelog.mobile.data.RecordDto
+import com.drivelog.mobile.core.model.CardElement
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -24,6 +25,7 @@ object Cards {
         check(temp.length() <= 15 * 1024 * 1024)
         check(temp.renameTo(file))
     }
-    fun render(record: RecordDto, photo: File, title: String, settings: JSONObject): Bitmap =
-        RecordCardRenderer.render(record, photo, title, settings)
+    fun render(record: RecordDto, photo: File, title: String, settings: JSONObject,
+        mapBackground: Bitmap? = null, blackElements: Set<CardElement> = emptySet()): Bitmap =
+        RecordCardRenderer.render(record, photo, title, settings, mapBackground, blackElements)
 }
