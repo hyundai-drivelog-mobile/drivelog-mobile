@@ -26,6 +26,8 @@ class DriveLogApi(baseUrl: String, private val token: () -> String?) {
         return List(records.length()) { RecordDto.parse(records.getJSONObject(it)) }
     }
 
+    fun stamps(): org.json.JSONArray = org.json.JSONArray(String(request("GET", "/stamps"), Charsets.UTF_8))
+
     fun washRecommendation(region: String): JSONObject {
         require(region.matches(Regex("[A-Z]+")))
         return JSONObject(String(request("GET", "/wash/recommendation?region=$region"), Charsets.UTF_8))

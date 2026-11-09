@@ -43,6 +43,7 @@ private object Route {
     const val Editor = "editor/{id}"
     const val Preview = "preview/{id}"
     const val WashDetail = "wash_detail"
+    const val Stamps = "stamps"
     fun detail(id: String) = "journey/$id"
     fun editor(id: String) = "editor/$id"
     fun preview(id: String) = "preview/$id"
@@ -140,7 +141,13 @@ private object Route {
                         if (nav.currentDestination?.route == Route.Home) {
                             nav.navigate(Route.WashDetail) { launchSingleTop = true }
                         }
-                    })
+                    }, onStamps = { nav.navigate(Route.Stamps) })
+            }
+            composable(Route.Stamps) {
+                LaunchedEffect(Unit) { if (!demo) model.syncStamps() }
+                com.drivelog.mobile.feature.journey.StampScreen(
+                    if (demo) emptyList() else model.stamps, model.busy, !demo && model.stampsLoaded,
+                    !demo && model.connected, { nav.popBackStack() }, { if (!demo) model.syncStamps() })
             }
             composable(Route.WashDetail) {
                 WashDetailScreen(washState, model.washRegion, model::selectWashRegion,

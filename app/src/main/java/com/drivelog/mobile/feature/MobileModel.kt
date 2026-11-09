@@ -29,6 +29,8 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     private val api = DriveLogApi(BuildConfig.API_URL) { token }
     var connected by mutableStateOf(token != null); private set
     var records by mutableStateOf(emptyList<RecordDto>()); private set
+    var stamps by mutableStateOf(emptyList<StampDto>()); private set
+    var stampsLoaded by mutableStateOf(false); private set
     var busy by mutableStateOf(false); private set
     var message by mutableStateOf(""); private set
     var selected by mutableStateOf<String?>(null)
@@ -43,6 +45,14 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     private var retryAt = 0L
     init { if (connected) RecordSyncWorker.schedule(context); viewModelScope.launch { records = withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).read() } } }
     private fun scopeId() = MessageDigest.getInstance("SHA-256").digest((token ?: "unlinked").toByteArray()).joinToString("") { "%02x".format(it) }
+    init {
+        val initialToken = token
+        val cache = File(directory(), "stamps.json")
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) { StampCache(cache).read() }
+            if (token == initialToken && !stampsLoaded) { stamps = saved; stampsLoaded = cache.exists() }
+        }
+    }
     private fun directory() = File(context.noBackupFilesDir, scopeId()).apply { mkdirs() }
     fun photo(id: String) = File(directory(), safeId(id) + ".jpg")
     private fun safeId(id: String) = MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).joinToString("") { "%02x".format(it) }
@@ -72,10 +82,20 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     }
     fun claim(code: String) = task {
         val next = withContext(Dispatchers.IO) { api.claim(code).also { vault.write(it) } }
-        if (next != token) { records = emptyList(); selected = null; context.getSystemService(NotificationManager::class.java).cancelAll() }
+        if (next != token) { records = emptyList(); stamps = emptyList(); stampsLoaded = false; selected = null; context.getSystemService(NotificationManager::class.java).cancelAll() }
         token = next; connected = true; context.getSharedPreferences("sync-${scopeId()}", Context.MODE_PRIVATE).edit().remove("unauthorized").apply(); RecordSyncWorker.schedule(context); syncNow()
     }
     fun sync() { if (connected) task { syncNow() } }
+    fun syncStamps() { if (connected) task { syncStampsNow() } }
+    private suspend fun syncStampsNow() {
+        val requestedToken = token
+        val cache = File(directory(), "stamps.json")
+        val fresh = withContext(Dispatchers.IO) { api.stamps() }
+        if (requestedToken != token) return
+        val parsed = StampDto.parse(fresh)
+        withContext(Dispatchers.IO) { StampCache(cache).write(fresh) }
+        if (requestedToken == token) { stamps = parsed; stampsLoaded = true }
+    }
     fun selectWashRegion(region: WashRegion) {
         if (region == washRegion) return
         washRegion = region
@@ -118,6 +138,7 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
             message = "새 기록 ${newRecords.size}건에 사진을 추가해보세요."
             newRecords.forEach { notify(it) }
         }
+        syncStampsNow()
     }
     private fun notify(record: RecordDto) = RecordArrivals.notify(context, scopeId(), record)
     fun openIntent(intent: Intent) { if (intent.getStringExtra("account") == scopeId()) selected = intent.getStringExtra("recordId") }
