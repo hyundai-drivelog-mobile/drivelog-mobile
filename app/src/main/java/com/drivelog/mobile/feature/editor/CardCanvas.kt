@@ -130,15 +130,12 @@ private fun isTemplateElementAt(position: Offset, width: Int, height: Int,
     }
 }
 
-@Composable fun PhotoFilterThumbnail(photo: File?, photoVersion: Int, filter: CardFilter,
-    modifier: Modifier = Modifier) {
-    val bitmap = remember(photo?.path, photoVersion) {
-        (photo?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) } ?: com.drivelog.mobile.feature.common.DrivePhotoAsset.filterBitmap()).asImageBitmap()
-    }
+@Composable fun PhotoFilterThumbnail(filter: CardFilter, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val bitmap = remember(context) { EditorThumbnailAsset.bitmap(context).asImageBitmap() }
     Box(modifier.clip(RoundedCornerShape(11.dp)).background(DriveColors.Gray100), contentAlignment = Alignment.Center) {
-        if (bitmap != null) Image(bitmap, "${filter.label} 사진 필터", Modifier.fillMaxSize(),
+        Image(bitmap, "${filter.label} 사진 필터", Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop, colorFilter = filterColor(filter))
-        else Text("사진 없음", style = MaterialTheme.typography.labelSmall, color = DriveColors.TertiaryText)
     }
 }
 

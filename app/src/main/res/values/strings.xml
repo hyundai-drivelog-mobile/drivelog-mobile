@@ -24,9 +24,8 @@
     <string name="empty_records_hint">차량 앱에서 주행을 완료하면 여기에 표시돼요.</string>
     <string name="choose_photo">사진 선택</string>
     <string name="preview">미리보기</string>
-    <string name="save_png">PNG 저장</string>
+    <string name="save_image">이미지 저장</string>
     <string name="keep_editing">편집 계속</string>
-    <string name="save_settings">설정 저장</string>
     <string name="editor_title">카드 만들기</string>
     <string name="tab_filter">필터</string>
     <string name="tab_layout">레이아웃</string>
