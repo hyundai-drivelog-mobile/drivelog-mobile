@@ -8,14 +8,22 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -34,9 +42,14 @@ import java.util.Locale
 
 enum class EditorTab { FILTER, LAYOUT, INFO }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun EditorScreen(record: RecordDto, draft: CardDraft, onDraft: (CardDraft) -> Unit, photo: File?, photoVersion: Int,
-    onBack: () -> Unit, onPhoto: () -> Unit, onPreview: () -> Unit, onSaveSettings: () -> Unit, onSave: () -> Unit = onPreview) {
+    onBack: () -> Unit, onPhoto: () -> Unit, onPreview: () -> Unit, onSave: () -> Unit = onPreview,
+    premiumUnlocked: Boolean = false, onMockPurchase: () -> Unit = {}) {
     var tab by remember(record.id) { mutableStateOf(EditorTab.FILTER) }
+    var pendingFilter by remember(record.id) { mutableStateOf<CardFilter?>(null) }
+    var pendingLayout by remember(record.id) { mutableStateOf<CardLayout?>(null) }
+    fun dismissPurchase() { pendingFilter = null; pendingLayout = null }
     BoxWithConstraints(Modifier.fillMaxSize().background(DriveColors.White)) {
         val panelHeight = if (maxHeight < 700.dp) 230.dp else 270.dp
         Column(Modifier.fillMaxSize()) {
@@ -79,8 +92,8 @@ enum class EditorTab { FILTER, LAYOUT, INFO }
                 }
                 Box(Modifier.fillMaxWidth().weight(1f)) {
                     when (tab) {
-                        EditorTab.FILTER -> FilterPicker(draft, photo, photoVersion, onDraft)
-                        EditorTab.LAYOUT -> LayoutPicker(record, draft, photo, photoVersion, onDraft)
+                        EditorTab.FILTER -> FilterPicker(draft, premiumUnlocked, onDraft) { pendingFilter = it }
+                        EditorTab.LAYOUT -> LayoutPicker(record, draft, premiumUnlocked, onDraft) { pendingLayout = it }
                         EditorTab.INFO -> InfoControls(draft, onDraft)
 
                     }
@@ -88,46 +101,115 @@ enum class EditorTab { FILTER, LAYOUT, INFO }
             }
         }
     }
+    if (pendingFilter != null || pendingLayout != null) {
+        ModalBottomSheet(onDismissRequest = ::dismissPurchase, containerColor = DriveColors.White) {
+            PurchasePrompt(pendingFilter?.label ?: pendingLayout?.label.orEmpty(),
+                onPurchase = {
+                    onMockPurchase()
+                    pendingFilter?.let { onDraft(draft.copy(filter = it)) }
+                    pendingLayout?.let { onDraft(draft.copy(layout = it)) }
+                    dismissPurchase()
+                }, onDismiss = ::dismissPurchase)
+        }
+    }
 }
 
-@Composable private fun FilterPicker(draft: CardDraft, photo: File?, photoVersion: Int, onDraft: (CardDraft) -> Unit) {
+@Composable private fun FilterPicker(draft: CardDraft, premiumUnlocked: Boolean,
+    onDraft: (CardDraft) -> Unit, onLocked: (CardFilter) -> Unit) {
     Column {
         Text("사진 분위기", Modifier.padding(horizontal = DriveDimens.Page), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(10.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = DriveDimens.Page), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             items(CardFilter.entries) { filter ->
-                Column(Modifier.clickable { onDraft(draft.copy(filter = filter)) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    PhotoFilterThumbnail(photo, photoVersion, filter, Modifier.size(72.dp, 82.dp)
-                        .border(if (draft.filter == filter) 2.dp else 1.dp,
-                            if (draft.filter == filter) DriveColors.Black else DriveColors.Border, RoundedCornerShape(11.dp)))
+                val locked = !premiumUnlocked && filter != CardFilter.ORIGINAL
+                Column(Modifier.semantics {
+                    if (locked) contentDescription = "${filter.label}, 잠김. 2,900원에 모든 카드 스타일 해금"
+                }.clickable {
+                    if (locked) onLocked(filter) else onDraft(draft.copy(filter = filter))
+                }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    OptionThumbnail(locked, RoundedCornerShape(11.dp), Modifier.size(72.dp, 82.dp)) {
+                        PhotoFilterThumbnail(filter, Modifier.fillMaxSize()
+                            .border(if (draft.filter == filter) 2.dp else 1.dp,
+                                if (draft.filter == filter) DriveColors.Black else DriveColors.Border, RoundedCornerShape(11.dp)))
+                    }
                     Spacer(Modifier.height(7.dp))
                     Text(filter.label, style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = if (draft.filter == filter) FontWeight.SemiBold else FontWeight.Medium),
-                        color = if (draft.filter == filter) DriveColors.Black else DriveColors.TertiaryText)
+                        color = if (locked) DriveColors.Gray500 else if (draft.filter == filter) DriveColors.Black else DriveColors.TertiaryText)
                 }
             }
         }
     }
 }
 
-@Composable private fun LayoutPicker(record: RecordDto, draft: CardDraft, photo: File?, photoVersion: Int, onDraft: (CardDraft) -> Unit) {
+@Composable private fun LayoutPicker(record: RecordDto, draft: CardDraft, premiumUnlocked: Boolean,
+    onDraft: (CardDraft) -> Unit, onLocked: (CardLayout) -> Unit) {
     Column {
         Text("카드 레이아웃", Modifier.padding(horizontal = DriveDimens.Page), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(10.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = DriveDimens.Page), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             items(listOf(CardLayout.PHOTO, CardLayout.STAT, CardLayout.ROUTE, CardLayout.JOURNAL, CardLayout.SPLIT)) { layout ->
-                Column(Modifier.clickable { onDraft(draft.copy(layout = layout)) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    LayoutThumbnail(layout, record, photo, photoVersion, Modifier.width(72.dp)
-                        .border(if (draft.layout == layout) 2.dp else 1.dp,
-                            if (draft.layout == layout) DriveColors.Black else DriveColors.Border, RoundedCornerShape(9.dp)),
-                        blackTemplate = draft.blackTemplate)
+                val locked = !premiumUnlocked && layout != CardLayout.PHOTO
+                Column(Modifier.semantics {
+                    if (locked) contentDescription = "${layout.label}, 잠김. 2,900원에 모든 카드 스타일 해금"
+                }.clickable {
+                    if (locked) onLocked(layout) else onDraft(draft.copy(layout = layout))
+                }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    OptionThumbnail(locked, RoundedCornerShape(9.dp), Modifier.size(72.dp, 96.dp)) {
+                        LayoutThumbnail(layout, record, draft, Modifier.fillMaxSize()
+                            .border(if (draft.layout == layout) 2.dp else 1.dp,
+                                if (draft.layout == layout) DriveColors.Black else DriveColors.Border, RoundedCornerShape(9.dp)))
+                    }
                     Spacer(Modifier.height(7.dp))
                     Text(layout.label, style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = if (draft.layout == layout) FontWeight.SemiBold else FontWeight.Medium),
-                        color = if (draft.layout == layout) DriveColors.Black else DriveColors.TertiaryText)
+                        color = if (locked) DriveColors.Gray500 else if (draft.layout == layout) DriveColors.Black else DriveColors.TertiaryText)
                 }
             }
         }
+    }
+}
+
+@Composable private fun OptionThumbnail(locked: Boolean, shape: RoundedCornerShape,
+    modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier) {
+        content()
+        if (locked) {
+            Box(Modifier.fillMaxSize().clip(shape).background(Brush.verticalGradient(
+                listOf(DriveColors.White.copy(alpha = .28f), DriveColors.White.copy(alpha = .52f)))))
+            Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(17.dp)
+                .shadow(2.dp, CircleShape)
+                .background(DriveColors.Gray900, CircleShape)
+                .border(.75.dp, DriveColors.White.copy(alpha = .85f), CircleShape),
+                contentAlignment = Alignment.Center) {
+                Canvas(Modifier.size(11.dp)) {
+                    val stroke = 1.25.dp.toPx()
+                    drawArc(Color.White, 180f, 180f, false,
+                        topLeft = Offset(size.width * .27f, size.height * .08f),
+                        size = Size(size.width * .46f, size.height * .60f), style = Stroke(stroke))
+                    drawRoundRect(Color.White,
+                        topLeft = Offset(size.width * .16f, size.height * .43f),
+                        size = Size(size.width * .68f, size.height * .49f),
+                        cornerRadius = CornerRadius(1.4.dp.toPx()))
+                    drawCircle(DriveColors.Gray900, radius = .8.dp.toPx(),
+                        center = Offset(size.width * .5f, size.height * .68f))
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun PurchasePrompt(itemName: String, onPurchase: () -> Unit, onDismiss: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(DriveDimens.Page)) {
+        Spacer(Modifier.height(38.dp))
+        Text("카드 스타일 모두 해금", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(12.dp))
+        Text("$itemName 항목을 포함한 필터 4개와 레이아웃 4개를 한 번에 사용할 수 있어요.",
+            style = MaterialTheme.typography.bodyLarge, color = DriveColors.Gray700)
+        Spacer(Modifier.height(48.dp))
+        DriveButton("2,900원 결제하기", onPurchase, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        DriveGhostButton("나중에", onDismiss, Modifier.fillMaxWidth())
     }
 }
 
@@ -165,5 +247,5 @@ enum class EditorTab { FILTER, LAYOUT, INFO }
 }
 
 @Preview @Composable private fun EditorPreview() { DRIVELOGMobileTheme {
-    EditorScreen(DemoJourneys.records.first(), CardDraft(), {}, null, 0, {}, {}, {}, {})
+    EditorScreen(DemoJourneys.records.first(), CardDraft(), {}, null, 0, {}, {}, {})
 } }

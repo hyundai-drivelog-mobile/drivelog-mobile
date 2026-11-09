@@ -55,9 +55,9 @@ private object Route {
     val snackbar = remember { SnackbarHostState() }
     var demo by remember { mutableStateOf(false) }
     var showLogin by remember { mutableStateOf(false) }
+    var premiumUnlocked by remember { mutableStateOf(false) }
     var activeId by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf(CardDraft()) }
-    var saved by remember { mutableStateOf(false) }
     val records = if (demo) DemoJourneys.records else model.records
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) activeId?.let { model.importPhoto(it, uri) }
@@ -77,8 +77,8 @@ private object Route {
         val record = records.find { it.id == id }
         if (record != null) {
             val stored = model.draft(id)
-            draft = cardDraftFrom(stored, record.placeName, record.title, record.cardJson)
-            saved = false
+            val loaded = cardDraftFrom(stored, record.placeName, record.title, record.cardJson)
+            draft = if (premiumUnlocked) loaded else loaded.copy(filter = CardFilter.ORIGINAL, layout = CardLayout.PHOTO)
             model.loadPhoto(record)
         }
         nav.navigate(Route.editor(id))
@@ -91,7 +91,6 @@ private object Route {
     }
     LaunchedEffect(model.message) {
         if (model.message.isNotBlank()) {
-            if (model.message == "카드를 저장했습니다.") saved = true
             snackbar.showSnackbar(model.message)
         }
     }
@@ -150,17 +149,15 @@ private object Route {
                 val record = records.find { it.id == entry.arguments?.getString("id") }
                 if (record != null) EditorScreen(record, draft, { draft = it }, model.photo(record.id), model.photoVersion,
                     { nav.popBackStack() }, { pick(record.id) }, { nav.navigate(Route.preview(record.id)) },
-                    { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate); scope.launch { snackbar.showSnackbar("편집 설정을 임시 저장했어요") } },
                     onSave = { if (model.photo(record.id).exists() || cardMapPoints(record, false).size >= 2) {
                         activeId = record.id; exporter.launch("DRIVELOG-${record.id}.png")
-                    } else pick(record.id) })
+                    } else pick(record.id) },
+                    premiumUnlocked = premiumUnlocked, onMockPurchase = { premiumUnlocked = true })
             }
             composable(Route.Preview, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                 val record = records.find { it.id == entry.arguments?.getString("id") }
-                if (record != null) FinalPreviewScreen(record, draft, model.photo(record.id), model.photoVersion, saved,
-                    { nav.popBackStack() }, { activeId = record.id; exporter.launch("DRIVELOG-${record.id}.png") },
-                    { if (demo || !model.photo(record.id).exists()) { model.saveDraft(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate); scope.launch { snackbar.showSnackbar("설정을 저장했어요") } }
-                      else model.save(record.id, draft.title.ifBlank { record.placeName }, draft.toSettings(), draft.blackTemplate) })
+                if (record != null) FinalPreviewScreen(record, draft, model.photo(record.id), model.photoVersion,
+                    { nav.popBackStack() }, { activeId = record.id; exporter.launch("DRIVELOG-${record.id}.png") })
             }
         }
     }
