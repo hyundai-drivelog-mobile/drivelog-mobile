@@ -19,6 +19,10 @@ class RecordSyncWorker(context: Context, parameters: WorkerParameters) : Worker(
             RecordArrivals.accept(applicationContext, account, records).forEach {
                 if (vault.read() == token) RecordArrivals.notify(applicationContext, account, it)
             }
+            val stamps = DriveLogApi(BuildConfig.API_URL) { token }.stamps()
+            if (vault.read() != token) return Result.success()
+            val directory = java.io.File(applicationContext.noBackupFilesDir, account).apply { mkdirs() }
+            StampCache(java.io.File(directory, "stamps.json")).write(stamps)
             Result.success()
         } catch (e: ApiFailure) {
             when (e.status) {

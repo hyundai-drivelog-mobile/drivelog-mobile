@@ -34,7 +34,7 @@ import java.io.File
 @Composable fun HomeScreen(records: List<RecordDto>, demo: Boolean, connected: Boolean,
     photoFor: (String) -> File?, photoVersion: Int, onList: () -> Unit, onDetail: (String) -> Unit,
     onEditor: (String) -> Unit, onLogin: () -> Unit, onVehicle: () -> Unit, onNotifications: () -> Unit,
-    onWash: () -> Unit) {
+    onWash: () -> Unit, onStamps: () -> Unit = onLogin) {
     val recent = records.maxByOrNull { it.startedAtMillis }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = DriveDimens.Page, end = DriveDimens.Page, bottom = 28.dp)) {
         item {
@@ -62,7 +62,7 @@ import java.io.File
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MoreFeature("추천 코스 공유", DriveIconType.ROUTE, Modifier.weight(1f), onLogin)
-                MoreFeature("도전과제", DriveIconType.AWARD, Modifier.weight(1f), onLogin)
+                MoreFeature("내 스탬프", DriveIconType.AWARD, Modifier.weight(1f), onStamps)
             }
             Spacer(Modifier.height(16.dp))
             HomeWashEntryCard(onWash)
