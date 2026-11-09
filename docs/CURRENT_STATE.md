@@ -4,6 +4,10 @@
 
 이 절은 아래 최초 인계의 실제 설치 미완료 설명보다 우선한다. 모바일 `feature/car-link`, 차량·서버 `feature/drive-card-redesign`의 변경을 각각 커밋하고 main 대상 PR로 제출한다. PR 병합은 하지 않는다.
 
+- Android PR: https://github.com/hyundai-drivelog-mobile/drivelog-mobile/pull/6 (구현 커밋 `93b98e0`).
+- 차량·서버 동반 PR: https://github.com/hyundai-drivelog/drivelog/pull/11 (구현 커밋 `7de764e`).
+- 두 PR 생성·푸시 완료 후 이 링크 갱신도 같은 브랜치에 추가 커밋한다. 다음 세션에는 리뷰·CI·병합 상태를 다시 확인한다. 이 PC의 Git 작성자는 미설정이므로 필요하면 현재 GitHub 계정 HongJongMin의 noreply 주소를 커밋 명령에만 적용한다.
+
 - 서버는 PostgreSQL 17.11 Compose + Spring local(8080)로 실행 중이었다. DB 자격 증명은 차량 저장소의 Git 제외 `server/.env`에 있다. 소스·PR에 토큰이나 비밀번호를 넣지 않는다.
 - `DRIVELOG_Pleos` / `emulator-5554` / 사용자 10에 두 앱이 설치되어 있고 6자리 코드로 연결했다. 모바일 업데이트 시 기존 앱 데이터·연결 토큰을 보존했다. 실제 휴대폰 연결 검증은 아니다.
 - 차량에서 에뮬레이터 GPS·기어 입력으로 광안리 → 해운대 약 5.6km·4분 기록을 만들었다. `베니키아호텔 해운대` 기록 카드가 모바일 최근 드라이브에 나타났고 `내 스탬프`에서 `해운대 해수욕장`, `2026.11.10 첫 방문`, 차량과 같은 선화 도장을 확인했다. 앱 자체 simulated 모드는 사용하지 않았지만 실차 데이터가 아닌 에뮬레이터 검증 기록이다. 사용자 요청 결과이므로 보존한다.
