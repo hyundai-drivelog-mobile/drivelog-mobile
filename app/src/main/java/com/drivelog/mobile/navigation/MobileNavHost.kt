@@ -27,6 +27,7 @@ import com.drivelog.mobile.feature.journey.JourneyDetailScreen
 import com.drivelog.mobile.feature.journey.JourneyListScreen
 import com.drivelog.mobile.feature.link.VehicleLinkScreen
 import com.drivelog.mobile.feature.splash.SplashScreen
+import com.drivelog.mobile.feature.wash.WashDetailScreen
 import com.drivelog.mobile.feature.Cards
 import com.drivelog.mobile.feature.journey.cardMapPoints
 import kotlinx.coroutines.launch
@@ -41,6 +42,7 @@ private object Route {
     const val Detail = "journey/{id}"
     const val Editor = "editor/{id}"
     const val Preview = "preview/{id}"
+    const val WashDetail = "wash_detail"
     fun detail(id: String) = "journey/$id"
     fun editor(id: String) = "editor/$id"
     fun preview(id: String) = "preview/$id"
@@ -58,6 +60,7 @@ private object Route {
     var premiumUnlocked by remember { mutableStateOf(false) }
     var activeId by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf(CardDraft()) }
+    val washState = model.washState
     val records = if (demo) DemoJourneys.records else model.records
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) activeId?.let { model.importPhoto(it, uri) }
@@ -128,10 +131,20 @@ private object Route {
                 }
             }
             composable(Route.Home) {
+                LaunchedEffect(Unit) { model.refreshWash() }
                 HomeScreen(records, demo, model.connected, { model.photo(it) }, model.photoVersion,
                     { openTopLevel(Route.List) }, { nav.navigate(Route.detail(it)) }, ::edit,
                     { showLogin = true }, { nav.navigate(Route.Link) },
-                    { scope.launch { snackbar.showSnackbar("새 주행 기록은 기록 화면에서 확인할 수 있어요") } })
+                    { scope.launch { snackbar.showSnackbar("새 주행 기록은 기록 화면에서 확인할 수 있어요") } },
+                    {
+                        if (nav.currentDestination?.route == Route.Home) {
+                            nav.navigate(Route.WashDetail) { launchSingleTop = true }
+                        }
+                    })
+            }
+            composable(Route.WashDetail) {
+                WashDetailScreen(washState, model.washRegion, model::selectWashRegion,
+                    onBack = { nav.popBackStack() })
             }
             composable(Route.List) {
                 JourneyListScreen(records, { nav.popBackStack() }, { nav.navigate(Route.detail(it)) }, { if (!demo) model.sync() }, { model.photo(it) }, model.photoVersion)

@@ -27,12 +27,14 @@ import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.common.*
 import com.drivelog.mobile.feature.journey.DriveRouteMapImage
 import com.drivelog.mobile.feature.journey.RecentDriveMapCache
+import com.drivelog.mobile.feature.wash.WashSparkleCarIcon
 import com.drivelog.mobile.ui.theme.*
 import java.io.File
 
 @Composable fun HomeScreen(records: List<RecordDto>, demo: Boolean, connected: Boolean,
     photoFor: (String) -> File?, photoVersion: Int, onList: () -> Unit, onDetail: (String) -> Unit,
-    onEditor: (String) -> Unit, onLogin: () -> Unit, onVehicle: () -> Unit, onNotifications: () -> Unit) {
+    onEditor: (String) -> Unit, onLogin: () -> Unit, onVehicle: () -> Unit, onNotifications: () -> Unit,
+    onWash: () -> Unit) {
     val recent = records.maxByOrNull { it.startedAtMillis }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = DriveDimens.Page, end = DriveDimens.Page, bottom = 28.dp)) {
         item {
@@ -62,7 +64,23 @@ import java.io.File
                 MoreFeature("추천 코스 공유", DriveIconType.ROUTE, Modifier.weight(1f), onLogin)
                 MoreFeature("도전과제", DriveIconType.AWARD, Modifier.weight(1f), onLogin)
             }
+            Spacer(Modifier.height(16.dp))
+            HomeWashEntryCard(onWash)
         }
+    }
+}
+
+@Composable private fun HomeWashEntryCard(onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).clip(RoundedCornerShape(20.dp))
+        .background(DriveColors.Gray100).clickable(onClick = onClick)
+        .padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        WashSparkleCarIcon(Modifier.size(28.dp))
+        Spacer(Modifier.width(16.dp))
+        Text("오늘의 세차", Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
+            color = DriveColors.Black, maxLines = 1)
+        Spacer(Modifier.width(8.dp))
+        DriveIcon(DriveIconType.CHEVRON, DriveColors.Gray500, Modifier.size(20.dp))
     }
 }
 
@@ -134,5 +152,5 @@ import java.io.File
 }
 
 @Preview @Composable private fun HomePreview() { DRIVELOGMobileTheme {
-    HomeScreen(DemoJourneys.records, true, false, { null }, 0, {}, {}, {}, {}, {}, {})
+    HomeScreen(DemoJourneys.records, true, false, { null }, 0, {}, {}, {}, {}, {}, {}, {})
 } }

@@ -26,6 +26,11 @@ class DriveLogApi(baseUrl: String, private val token: () -> String?) {
         return List(records.length()) { RecordDto.parse(records.getJSONObject(it)) }
     }
 
+    fun washRecommendation(region: String): JSONObject {
+        require(region.matches(Regex("[A-Z]+")))
+        return JSONObject(String(request("GET", "/wash/recommendation?region=$region"), Charsets.UTF_8))
+    }
+
     fun photo(id: String): ByteArray = request("GET", path(id, "photo"))
     fun uploadPhoto(id: String, bytes: ByteArray, mime: String) {
         require(mime == "image/jpeg" || mime == "image/png")

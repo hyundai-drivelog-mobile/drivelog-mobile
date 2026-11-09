@@ -13,6 +13,10 @@ import com.drivelog.mobile.data.*
 import com.drivelog.mobile.feature.common.DrivePhotoAsset
 import com.drivelog.mobile.feature.journey.RecentDriveMapCache
 import com.drivelog.mobile.feature.journey.cardMapPoints
+import com.drivelog.mobile.feature.wash.WashResponseMapper
+import com.drivelog.mobile.feature.wash.WashRegion
+import com.drivelog.mobile.feature.wash.WashUiState
+import com.drivelog.mobile.feature.wash.WashUiStates
 import kotlinx.coroutines.*
 import java.io.File
 import java.security.MessageDigest
@@ -29,6 +33,13 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     var message by mutableStateOf(""); private set
     var selected by mutableStateOf<String?>(null)
     var photoVersion by mutableIntStateOf(0); private set
+    var washState by mutableStateOf<WashUiState>(WashUiStates.loading); private set
+    var washRegion by mutableStateOf(runCatching {
+        WashRegion.valueOf(context.getSharedPreferences("wash", Context.MODE_PRIVATE)
+            .getString("region", WashRegion.SEOUL.name) ?: WashRegion.SEOUL.name)
+    }.getOrDefault(WashRegion.SEOUL)); private set
+    private var washBusy = false
+    private var washLastAttemptAt = 0L
     private var retryAt = 0L
     init { if (connected) RecordSyncWorker.schedule(context); viewModelScope.launch { records = withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).read() } } }
     private fun scopeId() = MessageDigest.getInstance("SHA-256").digest((token ?: "unlinked").toByteArray()).joinToString("") { "%02x".format(it) }
@@ -65,6 +76,39 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
         token = next; connected = true; context.getSharedPreferences("sync-${scopeId()}", Context.MODE_PRIVATE).edit().remove("unauthorized").apply(); RecordSyncWorker.schedule(context); syncNow()
     }
     fun sync() { if (connected) task { syncNow() } }
+    fun selectWashRegion(region: WashRegion) {
+        if (region == washRegion) return
+        washRegion = region
+        context.getSharedPreferences("wash", Context.MODE_PRIVATE).edit().putString("region", region.name).apply()
+        washState = WashUiStates.loading.copy(regionName = region.label)
+        washLastAttemptAt = 0L
+        refreshWash()
+    }
+    fun refreshWash() {
+        val now = System.currentTimeMillis()
+        if (washBusy || now - washLastAttemptAt < 5 * 60_000L) return
+        washBusy = true
+        washLastAttemptAt = now
+        val requestedRegion = washRegion
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    WashResponseMapper.fromJson(api.washRecommendation(requestedRegion.name))
+                }
+                if (washRegion == requestedRegion) washState = result
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                if (washRegion == requestedRegion) washState = WashUiStates.error.copy(regionName = requestedRegion.label)
+            } finally {
+                washBusy = false
+                if (washRegion != requestedRegion) {
+                    washLastAttemptAt = 0L
+                    refreshWash()
+                }
+            }
+        }
+    }
     private suspend fun syncNow() {
         val fresh = withContext(Dispatchers.IO) { api.journey() }
         val newRecords = withContext(Dispatchers.IO) { RecordArrivals.accept(context, scopeId(), fresh) }
