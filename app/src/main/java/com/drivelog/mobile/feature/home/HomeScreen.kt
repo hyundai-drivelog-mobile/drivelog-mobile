@@ -26,6 +26,7 @@ import com.drivelog.mobile.core.util.*
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.common.*
 import com.drivelog.mobile.feature.journey.DriveRouteMapImage
+import com.drivelog.mobile.feature.journey.DetailDriveRouteMap
 import com.drivelog.mobile.feature.journey.RecentDriveMapCache
 import com.drivelog.mobile.feature.wash.WashSparkleCarIcon
 import com.drivelog.mobile.ui.theme.*
@@ -104,7 +105,13 @@ import java.io.File
     val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
     Box(Modifier.fillMaxWidth().heightIn(min = 250.dp).height(270.dp).clip(RoundedCornerShape(20.dp))
         .background(Color(0xff303030)).clickable(onClick = onDetail)) {
-        DriveRouteMapImage(record, mapCache, photo, photoVersion, Modifier.fillMaxSize(), creditAlignment = Alignment.TopStart)
+        if (record.route.size >= 2) {
+            DetailDriveRouteMap(record, mapCache, Modifier.fillMaxWidth().height(220.dp),
+                creditAlignment = Alignment.TopStart)
+        } else {
+            DriveRouteMapImage(record, mapCache, photo, photoVersion, Modifier.fillMaxSize(),
+                creditAlignment = Alignment.TopStart)
+        }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .08f),
             Color.Black.copy(alpha = .13f), Color.Black.copy(alpha = .83f)))))
         Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp)) {

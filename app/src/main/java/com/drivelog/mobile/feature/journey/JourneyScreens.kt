@@ -350,8 +350,6 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             Text("다음 레벨까지 ${distance((1000.0 - totalKm).coerceAtLeast(0.0))}km 남음",
                 style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray300)
         }
-        Text("DRIVELOG  DEMO", Modifier.align(Alignment.TopEnd).background(Color(0xFFC8FF19), RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = DriveColors.Black)
     }
 }
 

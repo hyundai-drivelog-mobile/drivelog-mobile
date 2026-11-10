@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.drivelog.mobile.core.model.DemoJourneys
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.data.RoutePoint
 import com.drivelog.mobile.feature.common.DrivePhoto
@@ -110,7 +111,10 @@ internal class RecentDriveMapCache(context: Context) {
         includeRoute: Boolean = true): Bitmap? = lock.withLock {
         if (points.size < 2) return@withLock null
         val target = cacheFile(record, points, width, height, includeRoute)
-        withContext(Dispatchers.IO) { BitmapFactory.decodeFile(target.path) }?.let { return@withLock it }
+        val candidates = demoDonorFiles(record, points, width, height, includeRoute) + target
+        withContext(Dispatchers.IO) {
+            candidates.firstNotNullOfOrNull { BitmapFactory.decodeFile(it.path) }
+        }?.let { return@withLock it }
         try {
             val mapStyle = style ?: withContext(Dispatchers.IO) { loadStyle() }?.also { style = it } ?: return@withLock null
             val bitmap = withTimeoutOrNull(30_000L) { capture(points, width, height, mapStyle, includeRoute) } ?: return@withLock null
@@ -130,23 +134,25 @@ internal class RecentDriveMapCache(context: Context) {
     suspend fun loadDetail(record: RecordDto, points: List<RoutePoint>, width: Int, height: Int): DetailRouteMap? = lock.withLock {
         if (points.size < 2) return@withLock null
         val target = cacheFile(record, points, width, height, includeRoute = false)
-        val coordinates = File(directory, target.nameWithoutExtension + ".json")
+        val candidates = demoDonorFiles(record, points, width, height, includeRoute = false) + target
         val saved = withContext(Dispatchers.IO) {
-            runCatching {
-                val image = BitmapFactory.decodeFile(target.path) ?: return@runCatching null
-                try {
-                    val json = JSONArray(coordinates.readText())
-                    val route = (0 until json.length()).map { index ->
-                        val pair = json.getJSONArray(index)
-                        Offset(pair.getDouble(0).toFloat(), pair.getDouble(1).toFloat())
+            candidates.firstNotNullOfOrNull { candidate ->
+                runCatching {
+                    val image = BitmapFactory.decodeFile(candidate.path) ?: return@runCatching null
+                    try {
+                        val json = JSONArray(File(directory, candidate.nameWithoutExtension + ".json").readText())
+                        val route = (0 until json.length()).map { index ->
+                            val pair = json.getJSONArray(index)
+                            Offset(pair.getDouble(0).toFloat(), pair.getDouble(1).toFloat())
+                        }
+                        if (route.size == points.size) DetailRouteMap(image, route)
+                        else { image.recycle(); null }
+                    } catch (error: Exception) {
+                        image.recycle()
+                        throw error
                     }
-                    if (route.size == points.size) DetailRouteMap(image, route)
-                    else { image.recycle(); null }
-                } catch (error: Exception) {
-                    image.recycle()
-                    throw error
-                }
-            }.getOrNull()
+                }.getOrNull()
+            }
         }
         if (saved != null) return@withLock saved
         try {
@@ -163,7 +169,7 @@ internal class RecentDriveMapCache(context: Context) {
                 val temp = File(directory, target.name + ".tmp")
                 temp.outputStream().use { frame.bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
                 if (!temp.renameTo(target)) temp.delete()
-                coordinates.writeText(JSONArray().apply {
+                File(directory, target.nameWithoutExtension + ".json").writeText(JSONArray().apply {
                     frame.route.forEach { put(JSONArray().put(it.x.toDouble()).put(it.y.toDouble())) }
                 }.toString())
             }
@@ -175,11 +181,35 @@ internal class RecentDriveMapCache(context: Context) {
         }
     }
 
+    private fun demoDonorFiles(record: RecordDto, points: List<RoutePoint>, width: Int, height: Int,
+        includeRoute: Boolean): List<File> {
+        if (record.id != "demo-1" && record.id != "demo-2" && record.id != "demo-3") return emptyList()
+        val firstTime = points.first().epochMillis
+        return DemoJourneys.records.asSequence().filter { it.id.startsWith("demo-20") }.mapNotNull { donor ->
+            val donorPoints = validRoute(donor.route)
+            val donorStart = donorPoints.firstOrNull()?.epochMillis ?: return@mapNotNull null
+            val sameRoute = points.size == donorPoints.size && points.indices.all { index ->
+                val source = points[index]
+                val other = donorPoints[index]
+                source.latitude == other.latitude && source.longitude == other.longitude &&
+                    source.epochMillis - firstTime == other.epochMillis - donorStart
+            }
+            if (sameRoute) cacheFile(donor, donorPoints, width, height, includeRoute) else null
+        }.toList()
+    }
+
     private fun cacheFile(record: RecordDto, points: List<RoutePoint>, width: Int, height: Int,
         includeRoute: Boolean): File {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update("$STYLE_VERSION|${record.id}|$width|$height|$includeRoute".toByteArray())
-        points.forEach { digest.update("|${it.latitude},${it.longitude},${it.epochMillis}".toByteArray()) }
+        // The three rolling demo records get new absolute timestamps on every app launch.
+        // Their route shape and time gaps are unchanged, so keep their map cache stable.
+        val rollingDemo = record.id == "demo-1" || record.id == "demo-2" || record.id == "demo-3"
+        val firstTime = points.first().epochMillis
+        points.forEach {
+            val timeKey = if (rollingDemo) it.epochMillis - firstTime else it.epochMillis
+            digest.update("|${it.latitude},${it.longitude},$timeKey".toByteArray())
+        }
         val name = digest.digest().joinToString("") { "%02x".format(it) }
         return File(directory, "$name.jpg")
     }
@@ -327,7 +357,8 @@ internal fun RecentDriveMapThumbnail(
 ) = DriveRouteMapImage(record, cache, photo, photoVersion, modifier, compactCredit = true)
 
 @Composable
-internal fun DetailDriveRouteMap(record: RecordDto, cache: RecentDriveMapCache, modifier: Modifier = Modifier) {
+internal fun DetailDriveRouteMap(record: RecordDto, cache: RecentDriveMapCache,
+    modifier: Modifier = Modifier, creditAlignment: Alignment = Alignment.BottomStart) {
     val points = remember(record.route) { validRoute(record.route) }
     val view = LocalView.current
     var mapSize by remember(record.id) { mutableStateOf(IntSize.Zero) }
@@ -372,23 +403,7 @@ internal fun DetailDriveRouteMap(record: RecordDto, cache: RecentDriveMapCache, 
         }
         Canvas(Modifier.fillMaxSize()) {
             if (route.size < 2) return@Canvas
-            var remaining = totalLength * trace.value
-            val path = Path().apply { moveTo(route.first().x, route.first().y) }
-            for (index in 1 until route.size) {
-                val from = route[index - 1]
-                val to = route[index]
-                val length = (to - from).getDistance().toDouble()
-                if (remaining >= length) {
-                    path.lineTo(to.x, to.y)
-                    remaining -= length
-                } else {
-                    if (length > 0) {
-                        val part = (remaining / length).toFloat().coerceIn(0f, 1f)
-                        path.lineTo(from.x + (to.x - from.x) * part, from.y + (to.y - from.y) * part)
-                    }
-                    break
-                }
-            }
+            val path = tracedRoutePath(route, trace.value, totalLength)
             val stroke = minOf(size.minDimension * .045f, 5.dp.toPx())
             drawPath(path, Color.White, style = Stroke(stroke, cap = StrokeCap.Round,
                 join = androidx.compose.ui.graphics.StrokeJoin.Round))
@@ -399,7 +414,7 @@ internal fun DetailDriveRouteMap(record: RecordDto, cache: RecentDriveMapCache, 
                 drawCircle(Color(0xFF131417), stroke, route.last())
             }
         }
-        if (current != null) Text(MAP_ATTRIBUTION, Modifier.align(Alignment.BottomStart).fillMaxWidth()
+        if (current != null) Text(MAP_ATTRIBUTION, Modifier.align(creditAlignment).fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 8.dp), color = Color.White,
             fontSize = 9.sp, lineHeight = 11.sp, maxLines = 1)
     }
@@ -420,7 +435,30 @@ private fun fitRoute(points: List<RoutePoint>, width: Float, height: Float): Lis
         (oy + (-it.latitude - minY) * scale).toFloat()) }
 }
 
-private fun smoothRoute(points: List<Offset>): List<Offset> {
+internal fun tracedRoutePath(route: List<Offset>, fraction: Float, totalLength: Double): Path {
+    val path = Path()
+    if (route.isEmpty()) return path
+    path.moveTo(route.first().x, route.first().y)
+    var remaining = totalLength * fraction.coerceIn(0f, 1f)
+    for (index in 1 until route.size) {
+        val from = route[index - 1]
+        val to = route[index]
+        val length = (to - from).getDistance().toDouble()
+        if (remaining >= length) {
+            path.lineTo(to.x, to.y)
+            remaining -= length
+        } else {
+            if (length > 0) {
+                val part = (remaining / length).toFloat().coerceIn(0f, 1f)
+                path.lineTo(from.x + (to.x - from.x) * part, from.y + (to.y - from.y) * part)
+            }
+            break
+        }
+    }
+    return path
+}
+
+internal fun smoothRoute(points: List<Offset>): List<Offset> {
     if (points.size < 3) return points
     val result = ArrayList<Offset>(points.size * 4)
     result.add(points.first())

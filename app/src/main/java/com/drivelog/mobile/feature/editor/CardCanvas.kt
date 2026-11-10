@@ -28,8 +28,6 @@ import com.drivelog.mobile.core.util.displayDistance
 import com.drivelog.mobile.core.util.displayDuration
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.Cards
-import com.drivelog.mobile.feature.journey.RecentDriveMapCache
-import com.drivelog.mobile.feature.journey.cardMapPoints
 import com.drivelog.mobile.ui.theme.DriveColors
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -40,29 +38,45 @@ import kotlinx.coroutines.withContext
     onPhotoClick: (() -> Unit)? = null) {
     val photoExists = photo?.exists() == true
     val context = androidx.compose.ui.platform.LocalContext.current
-    val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
-    val source = remember(photo?.path, photoVersion, photoExists) { if (photoExists) photo!! else com.drivelog.mobile.feature.common.DrivePhotoAsset.file(context) }
+    val source = remember(photo?.path, photoVersion, photoExists) {
+        if (photoExists) photo!! else EditorThumbnailAsset.file(context)
+    }
     val photoBounds = remember(photo?.path, photoVersion) {
         photo?.takeIf { it.exists() }?.let {
             BitmapFactory.Options().apply { inJustDecodeBounds = true }.also { options -> BitmapFactory.decodeFile(it.path, options) }
         }
     }
-    val rendered by produceState<ImageBitmap?>(null, record.id, draft, photoVersion, photoExists) {
-        val map = if (!photoExists) {
-            val points = cardMapPoints(record, draft.showRoute && draft.trimEnds)
-            if (points.size >= 2) mapCache.load(record, points, 900, 1200, includeRoute = false) else null
-        } else null
+    val rendered by produceState<CardPreview?>(null, record.id, draft, photoVersion, photoExists) {
         value = withContext(Dispatchers.IO) {
-            Cards.render(context, record, source, draft.title.ifBlank { record.placeName }, draft.toSettings(), map,
-                draft.blackTemplate).asImageBitmap()
+            val title = draft.title.ifBlank { record.placeName }
+            val popup = draft.layout == CardLayout.STAT || draft.layout == CardLayout.JOURNAL
+            val settings = draft.animatedPreviewSettings(record).apply {
+                if (popup) put("previewHidePopupElements", true)
+            }
+            val base = Cards.render(context, record, source, title, settings,
+                blackTemplate = draft.blackTemplate)
+            val layers = if (popup) {
+                val count = if (draft.layout == CardLayout.STAT) 3 else 4
+                (0 until count).map { index ->
+                    val overlaySettings = draft.toSettings().apply {
+                        put("previewPopupOverlayOnly", true)
+                        put("previewPopupElement", index)
+                    }
+                    val overlay = Cards.render(context, record, source, title, overlaySettings,
+                        blackTemplate = draft.blackTemplate)
+                    try { popupLayer(overlay, draft.layout, index) } finally { overlay.recycle() }
+                }
+            } else emptyList()
+            CardPreview(draft.layout, base.asImageBitmap(), layers)
         }
     }
     val currentDraft by rememberUpdatedState(draft)
     val currentChange by rememberUpdatedState(onCropChange)
     val currentPhotoClick by rememberUpdatedState(onPhotoClick)
     BoxWithConstraints(modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(18.dp)).background(DriveColors.Gray100)) {
-        if (rendered != null) Image(rendered!!, "편집 중인 실제 카드", Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-        else com.drivelog.mobile.feature.common.DrivePhoto(modifier = Modifier.fillMaxSize())
+        if (rendered?.layout == draft.layout)
+            AnimatedCardArtwork(draft.layout, record, draft, rendered!!, Modifier.fillMaxSize())
+        else com.drivelog.mobile.feature.common.DrivePhoto(source, photoVersion, Modifier.fillMaxSize())
         if (onCropChange != null || onPhotoClick != null) {
             val transform = if (photoExists && onCropChange != null) Modifier.pointerInput(photo?.path, draft.layout) {
                 detectTransformGestures { _, pan, gestureZoom, _ ->
