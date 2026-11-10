@@ -1,6 +1,8 @@
 ﻿package com.drivelog.mobile.feature
 
 import android.graphics.*
+import android.content.Context
+import com.drivelog.mobile.R
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.core.util.CropMath
 import com.drivelog.mobile.core.util.displayDuration
@@ -12,7 +14,7 @@ import kotlin.math.*
 
 /** Native port of the source project's server/static/m/card.js record templates. */
 object RecordCardRenderer {
-    fun render(r: RecordDto, photo: File, title: String, o: JSONObject, mapBackground: Bitmap? = null,
+    fun render(context: Context, r: RecordDto, photo: File, title: String, o: JSONObject, mapBackground: Bitmap? = null,
         blackTemplate: Boolean = false): Bitmap {
         val result = Bitmap.createBitmap(1200, 1600, Bitmap.Config.ARGB_8888)
         val c = Canvas(result)
@@ -82,11 +84,14 @@ object RecordCardRenderer {
         if (stat && o.optBoolean("showPlace",true)) {
             p.textSize=51f; p.typeface=Typeface.create(Typeface.DEFAULT,Typeface.BOLD)
             val markerX=(1020f-minOf(p.measureText(title),565f)-47f).coerceAtLeast(400f)
-            p.color=ink; p.style=Paint.Style.STROKE; p.strokeWidth=5f
-            c.drawCircle(markerX,83f,17f,p)
-            c.drawLine(markerX-13f,94f,markerX,120f,p)
-            c.drawLine(markerX+13f,94f,markerX,120f,p)
-            p.style=Paint.Style.FILL
+            val marker = BitmapFactory.decodeResource(context.resources, R.drawable.icon_focus_marker)
+            try {
+                p.colorFilter = PorterDuffColorFilter(ink, PorterDuff.Mode.SRC_IN)
+                c.drawBitmap(marker, null, RectF(markerX - 24f, 62f, markerX + 24f, 126f), p)
+            } finally {
+                p.colorFilter = null
+                marker.recycle()
+            }
             text(title,1020f,117f,51f,true,565f,Paint.Align.RIGHT)
         }
         if (journal) {

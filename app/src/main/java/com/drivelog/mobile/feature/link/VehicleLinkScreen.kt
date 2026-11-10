@@ -29,12 +29,9 @@ import com.drivelog.mobile.ui.theme.*
             Text(error, color = DriveColors.Black, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(28.dp))
-        DriveButton(stringResource(R.string.link_action), { onLink(code) }, Modifier.fillMaxWidth(), code.length == 6 && !busy)
-        Spacer(Modifier.height(16.dp))
-        Spacer(Modifier.height(48.dp))
-        HorizontalDivider(color = DriveColors.Gray200)
-        Spacer(Modifier.height(16.dp))
-        DriveOutlineButton(stringResource(R.string.demo_action), onDemo, Modifier.fillMaxWidth())
+        DriveButton(stringResource(R.string.link_action), {
+            if (code == "000000") onDemo() else onLink(code)
+        }, Modifier.fillMaxWidth(), code.length == 6 && !busy)
         Spacer(Modifier.height(24.dp))
     }
 }

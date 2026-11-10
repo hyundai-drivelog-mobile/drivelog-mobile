@@ -1,7 +1,6 @@
 package com.drivelog.mobile.feature.wash
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,8 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drivelog.mobile.R
 import com.drivelog.mobile.core.designsystem.DriveDimens
+import com.drivelog.mobile.core.designsystem.picker.WheelPickerBottomSheet
 import com.drivelog.mobile.feature.common.BackButton
 import com.drivelog.mobile.ui.theme.DRIVELOGMobileTheme
 import com.drivelog.mobile.ui.theme.DriveColors
@@ -109,45 +107,16 @@ private fun RegionSelector(selected: WashRegion, onSelected: (WashRegion) -> Uni
             .clickable { expanded = true }.padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center) {
             Text(selected.label, style = MaterialTheme.typography.labelMedium,
-                color = DriveColors.SecondaryText, maxLines = 1)
+                color = DriveColors.Black, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
-        DropdownMenu(
-            expanded = expanded, onDismissRequest = { expanded = false },
-            modifier = Modifier.width(224.dp).heightIn(max = 380.dp),
-            shape = RoundedCornerShape(18.dp),
-            containerColor = DriveColors.White,
-            tonalElevation = 0.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, DriveColors.Border)
-        ) {
-            Text("지역 선택", Modifier.padding(start = 18.dp, top = 14.dp, bottom = 8.dp),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = DriveColors.Black)
-            WashRegion.entries.forEach { region ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            region.label,
-                            color = DriveColors.Black,
-                            fontWeight = if (region == selected) FontWeight.SemiBold else FontWeight.Normal,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    trailingIcon = {
-                        if (region == selected) Text("✓", color = DriveColors.Black,
-                            fontWeight = FontWeight.Bold)
-                    },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (region == selected) DriveColors.Gray100 else DriveColors.White),
-                    onClick = {
-                        expanded = false
-                        onSelected(region)
-                    },
-                    colors = androidx.compose.material3.MenuDefaults.itemColors(
-                        textColor = DriveColors.Black, trailingIconColor = DriveColors.Black)
-                )
-            }
+        if (expanded) {
+            WheelPickerBottomSheet("지역 선택", selected, WashRegion.entries,
+                { it.label },
+                onConfirm = {
+                    expanded = false
+                    onSelected(it)
+                },
+                onDismiss = { expanded = false })
         }
     }
 }

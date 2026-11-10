@@ -46,7 +46,7 @@ import java.io.File
                 }
             }
             Spacer(Modifier.height(10.dp))
-            VehicleConnectionCard(connected, demo, onVehicle)
+            VehicleConnectionCard(connected, onVehicle)
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("최근 드라이브", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
@@ -84,22 +84,17 @@ import java.io.File
     }
 }
 
-@Composable private fun VehicleConnectionCard(connected: Boolean, demo: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).clip(RoundedCornerShape(18.dp))
+@Composable private fun VehicleConnectionCard(connected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).clip(RoundedCornerShape(20.dp))
         .background(DriveColors.Gray100).clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(42.dp).background(DriveColors.White, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-            DriveIcon(DriveIconType.CAR, DriveColors.Black)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기",
-                style = MaterialTheme.typography.labelLarge, maxLines = 2)
-            Spacer(Modifier.height(4.dp))
-            Text(when { demo -> "데모 기록 사용 중"; connected -> "DRIVELOG 차량 연결됨"; else -> "차량 화면의 6자리 코드를 입력하세요" },
-                style = MaterialTheme.typography.labelMedium, color = DriveColors.SecondaryText, maxLines = 2)
-        }
-        DriveIcon(DriveIconType.CHEVRON, DriveColors.SecondaryText, Modifier.size(20.dp))
+        DriveIcon(DriveIconType.CAR, DriveColors.Black, Modifier.size(28.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기", Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
+            color = DriveColors.Black, maxLines = 1)
+        Spacer(Modifier.width(8.dp))
+        DriveIcon(DriveIconType.CHEVRON, DriveColors.Gray500, Modifier.size(20.dp))
     }
 }
 

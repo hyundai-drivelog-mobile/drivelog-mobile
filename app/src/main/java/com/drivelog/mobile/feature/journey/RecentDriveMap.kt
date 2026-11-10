@@ -7,6 +7,9 @@ import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -82,6 +87,8 @@ internal fun cardMapPoints(record: RecordDto, trimEnds: Boolean): List<RoutePoin
     return points.drop(cut).dropLast(cut)
 }
 
+internal data class DetailRouteMap(val bitmap: Bitmap, val route: List<Offset>)
+
 /** One snapshotter and one request at a time, as in the vehicle card cache. */
 internal class RecentDriveMapCache(context: Context) {
     companion object {
@@ -120,6 +127,54 @@ internal class RecentDriveMapCache(context: Context) {
         }
     }
 
+    suspend fun loadDetail(record: RecordDto, points: List<RoutePoint>, width: Int, height: Int): DetailRouteMap? = lock.withLock {
+        if (points.size < 2) return@withLock null
+        val target = cacheFile(record, points, width, height, includeRoute = false)
+        val coordinates = File(directory, target.nameWithoutExtension + ".json")
+        val saved = withContext(Dispatchers.IO) {
+            runCatching {
+                val image = BitmapFactory.decodeFile(target.path) ?: return@runCatching null
+                try {
+                    val json = JSONArray(coordinates.readText())
+                    val route = (0 until json.length()).map { index ->
+                        val pair = json.getJSONArray(index)
+                        Offset(pair.getDouble(0).toFloat(), pair.getDouble(1).toFloat())
+                    }
+                    if (route.size == points.size) DetailRouteMap(image, route)
+                    else { image.recycle(); null }
+                } catch (error: Exception) {
+                    image.recycle()
+                    throw error
+                }
+            }.getOrNull()
+        }
+        if (saved != null) return@withLock saved
+        try {
+            val mapStyle = style ?: withContext(Dispatchers.IO) { loadStyle() }?.also { style = it } ?: return@withLock null
+            val frame = withTimeoutOrNull(30_000L) {
+                withContext(Dispatchers.Main) {
+                    val snapshot = captureSnapshot(points, width, height, mapStyle) ?: return@withContext null
+                    DetailRouteMap(snapshot.bitmap.copy(Bitmap.Config.ARGB_8888, false), points.map {
+                        snapshot.pixelForLatLng(LatLng(it.latitude, it.longitude)).let { pixel -> Offset(pixel.x, pixel.y) }
+                    })
+                }
+            } ?: return@withLock null
+            withContext(Dispatchers.IO) {
+                val temp = File(directory, target.name + ".tmp")
+                temp.outputStream().use { frame.bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+                if (!temp.renameTo(target)) temp.delete()
+                coordinates.writeText(JSONArray().apply {
+                    frame.route.forEach { put(JSONArray().put(it.x.toDouble()).put(it.y.toDouble())) }
+                }.toString())
+            }
+            frame
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun cacheFile(record: RecordDto, points: List<RoutePoint>, width: Int, height: Int,
         includeRoute: Boolean): File {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -144,8 +199,12 @@ internal class RecentDriveMapCache(context: Context) {
     }.getOrNull()
 
     private suspend fun capture(points: List<RoutePoint>, width: Int, height: Int, style: String,
-        includeRoute: Boolean): Bitmap? =
-        withContext(Dispatchers.Main) {
+        includeRoute: Boolean): Bitmap? = withContext(Dispatchers.Main) {
+            val snapshot = captureSnapshot(points, width, height, style) ?: return@withContext null
+            if (includeRoute) drawRoute(snapshot, points) else snapshot.bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        }
+
+    private suspend fun captureSnapshot(points: List<RoutePoint>, width: Int, height: Int, style: String): MapSnapshot? {
             MapLibre.getInstance(context)
             val south = points.minOf { it.latitude }; val north = points.maxOf { it.latitude }
             val west = points.minOf { it.longitude }; val east = points.maxOf { it.longitude }
@@ -162,12 +221,11 @@ internal class RecentDriveMapCache(context: Context) {
                 .withRegion(bounds).withLogo(false).withAttribution(false).withStyleBuilder(Style.Builder().fromJson(style)))
                 .also { snapshotter = it }
             snapshotSize = width to height
-            val snapshot = awaitSnapshot(renderer) ?: run {
+            return awaitSnapshot(renderer) ?: run {
                 delay(1_000)
                 awaitSnapshot(renderer)
-            } ?: return@withContext null
-            if (includeRoute) drawRoute(snapshot, points) else snapshot.bitmap.copy(Bitmap.Config.ARGB_8888, false)
-        }
+            }
+    }
 
     private suspend fun awaitSnapshot(renderer: MapSnapshotter): MapSnapshot? =
         suspendCancellableCoroutine { continuation ->
@@ -267,6 +325,123 @@ internal fun RecentDriveMapThumbnail(
     record: RecordDto, cache: RecentDriveMapCache, photo: File?, photoVersion: Int,
     modifier: Modifier = Modifier,
 ) = DriveRouteMapImage(record, cache, photo, photoVersion, modifier, compactCredit = true)
+
+@Composable
+internal fun DetailDriveRouteMap(record: RecordDto, cache: RecentDriveMapCache, modifier: Modifier = Modifier) {
+    val points = remember(record.route) { validRoute(record.route) }
+    val view = LocalView.current
+    var mapSize by remember(record.id) { mutableStateOf(IntSize.Zero) }
+    var visible by remember(record.id) { mutableStateOf(false) }
+    var frame by remember(record.id) { mutableStateOf<DetailRouteMap?>(null) }
+    var loaded by remember(record.id) { mutableStateOf(false) }
+    val trace = remember(record.id) { Animatable(0f) }
+    LaunchedEffect(record.id, points, visible, mapSize) {
+        if (visible && points.size >= 2 && mapSize.width > 0 && mapSize.height > 0) {
+            loaded = false
+            frame = cache.loadDetail(record, points, mapSize.width, mapSize.height)
+            loaded = true
+        } else {
+            frame = null
+            loaded = false
+        }
+    }
+    val route = remember(frame, loaded, mapSize, points) {
+        when {
+            frame != null -> smoothRoute(frame!!.route)
+            loaded && mapSize.width > 0 && mapSize.height > 0 ->
+                smoothRoute(fitRoute(points, mapSize.width.toFloat(), mapSize.height.toFloat()))
+            else -> emptyList()
+        }
+    }
+    val totalLength = remember(route) { route.zipWithNext().sumOf { (a, b) -> (b - a).getDistance().toDouble() } }
+    LaunchedEffect(route) {
+        trace.snapTo(0f)
+        if (route.size >= 2) trace.animateTo(1f, tween(1600, easing = FastOutSlowInEasing))
+    }
+    Box(modifier.onGloballyPositioned { coordinates ->
+        val bounds = coordinates.boundsInWindow()
+        mapSize = coordinates.size
+        visible = bounds.bottom > 0f && bounds.top < view.rootView.height
+    }.background(Color(0xFF131417)).semantics { contentDescription = "주행 경로 지도" }) {
+        val current = frame
+        if (current != null) {
+            Image(current.bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            RouteMapPlaceholder(emptyList(), Modifier.fillMaxSize())
+            if (points.size < 2) Text("경로 정보 없음", Modifier.align(Alignment.Center), color = Color.White)
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            if (route.size < 2) return@Canvas
+            var remaining = totalLength * trace.value
+            val path = Path().apply { moveTo(route.first().x, route.first().y) }
+            for (index in 1 until route.size) {
+                val from = route[index - 1]
+                val to = route[index]
+                val length = (to - from).getDistance().toDouble()
+                if (remaining >= length) {
+                    path.lineTo(to.x, to.y)
+                    remaining -= length
+                } else {
+                    if (length > 0) {
+                        val part = (remaining / length).toFloat().coerceIn(0f, 1f)
+                        path.lineTo(from.x + (to.x - from.x) * part, from.y + (to.y - from.y) * part)
+                    }
+                    break
+                }
+            }
+            val stroke = minOf(size.minDimension * .045f, 5.dp.toPx())
+            drawPath(path, Color.White, style = Stroke(stroke, cap = StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            drawCircle(Color(0xFF131417), stroke * 1.6f, route.first())
+            drawCircle(Color.White, stroke, route.first())
+            if (trace.value >= 1f) {
+                drawCircle(Color.White, stroke * 1.6f, route.last())
+                drawCircle(Color(0xFF131417), stroke, route.last())
+            }
+        }
+        if (current != null) Text(MAP_ATTRIBUTION, Modifier.align(Alignment.BottomStart).fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 8.dp), color = Color.White,
+            fontSize = 9.sp, lineHeight = 11.sp, maxLines = 1)
+    }
+}
+
+private fun fitRoute(points: List<RoutePoint>, width: Float, height: Float): List<Offset> {
+    if (points.size < 2) return emptyList()
+    val k = cos(Math.toRadians(points.map { it.latitude }.average()))
+    val xs = points.map { it.longitude * k }
+    val ys = points.map { -it.latitude }
+    val minX = xs.min(); val minY = ys.min()
+    val spanX = (xs.max() - minX).coerceAtLeast(1e-6)
+    val spanY = (ys.max() - minY).coerceAtLeast(1e-6)
+    val scale = minOf(width * .78 / spanX, height * .78 / spanY)
+    val ox = (width - spanX * scale) / 2
+    val oy = (height - spanY * scale) / 2
+    return points.map { Offset((ox + (it.longitude * k - minX) * scale).toFloat(),
+        (oy + (-it.latitude - minY) * scale).toFloat()) }
+}
+
+private fun smoothRoute(points: List<Offset>): List<Offset> {
+    if (points.size < 3) return points
+    val result = ArrayList<Offset>(points.size * 4)
+    result.add(points.first())
+    for (index in 0 until points.lastIndex) {
+        val p0 = points[(index - 1).coerceAtLeast(0)]
+        val p1 = points[index]
+        val p2 = points[index + 1]
+        val p3 = points[(index + 2).coerceAtMost(points.lastIndex)]
+        for (step in 1..4) {
+            val t = step / 4f
+            val t2 = t * t
+            val t3 = t2 * t
+            fun coordinate(a: Float, b: Float, c: Float, d: Float) = .5f *
+                (2f * b + (-a + c) * t + (2f * a - 5f * b + 4f * c - d) * t2 +
+                    (-a + 3f * b - 3f * c + d) * t3)
+            result.add(Offset(coordinate(p0.x, p1.x, p2.x, p3.x),
+                coordinate(p0.y, p1.y, p2.y, p3.y)))
+        }
+    }
+    return result
+}
 
 @Composable
 private fun RouteMapPlaceholder(points: List<RoutePoint>, modifier: Modifier = Modifier) {

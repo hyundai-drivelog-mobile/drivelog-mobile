@@ -74,7 +74,7 @@ fun MonthWheelPickerBottomSheet(
 }
 
 @Composable
-private fun <T> WheelPickerBottomSheet(
+fun <T> WheelPickerBottomSheet(
     title: String,
     selectedValue: T,
     availableValues: List<T>,

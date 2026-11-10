@@ -145,7 +145,7 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
         } else null
         withContext(Dispatchers.IO) {
             val source = if (selectedPhoto.exists()) selectedPhoto else DrivePhotoAsset.file(context)
-            val bitmap = Cards.render(record, source, title, settings, map, blackTemplate)
+            val bitmap = Cards.render(context, record, source, title, settings, map, blackTemplate)
             try { context.contentResolver.openOutputStream(uri)?.use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) } ?: error("저장 실패") }
             finally { bitmap.recycle() }
         }

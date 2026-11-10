@@ -53,7 +53,7 @@ import kotlinx.coroutines.withContext
             if (points.size >= 2) mapCache.load(record, points, 900, 1200, includeRoute = false) else null
         } else null
         value = withContext(Dispatchers.IO) {
-            Cards.render(record, source, draft.title.ifBlank { record.placeName }, draft.toSettings(), map,
+            Cards.render(context, record, source, draft.title.ifBlank { record.placeName }, draft.toSettings(), map,
                 draft.blackTemplate).asImageBitmap()
         }
     }

@@ -19,9 +19,11 @@ import com.drivelog.mobile.ui.theme.DriveColors
         Spacer(Modifier.height(26.dp))
         Column(Modifier.fillMaxWidth().background(DriveColors.Gray100, RoundedCornerShape(18.dp)).padding(20.dp)) {
             Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            Text(if (demo) "데모 기록 사용 중" else if (connected) "DRIVELOG 차량 연결됨" else "연결된 차량이 없습니다",
-                style = MaterialTheme.typography.bodyMedium, color = DriveColors.SecondaryText)
+            if (!demo) {
+                Spacer(Modifier.height(6.dp))
+                Text(if (connected) "DRIVELOG 차량 연결됨" else "연결된 차량이 없습니다",
+                    style = MaterialTheme.typography.bodyMedium, color = DriveColors.SecondaryText)
+            }
         }
         Spacer(Modifier.height(14.dp))
         DriveOutlineButton("차량 연결 화면", onVehicle, Modifier.fillMaxWidth())
