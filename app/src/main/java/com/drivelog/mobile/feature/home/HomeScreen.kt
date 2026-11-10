@@ -26,6 +26,7 @@ import com.drivelog.mobile.core.util.*
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.feature.common.*
 import com.drivelog.mobile.feature.journey.DriveRouteMapImage
+import com.drivelog.mobile.feature.journey.DetailDriveRouteMap
 import com.drivelog.mobile.feature.journey.RecentDriveMapCache
 import com.drivelog.mobile.feature.wash.WashSparkleCarIcon
 import com.drivelog.mobile.ui.theme.*
@@ -46,7 +47,7 @@ import java.io.File
                 }
             }
             Spacer(Modifier.height(10.dp))
-            VehicleConnectionCard(connected, demo, onVehicle)
+            VehicleConnectionCard(connected, onVehicle)
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("최근 드라이브", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
@@ -84,22 +85,17 @@ import java.io.File
     }
 }
 
-@Composable private fun VehicleConnectionCard(connected: Boolean, demo: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).clip(RoundedCornerShape(18.dp))
+@Composable private fun VehicleConnectionCard(connected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).clip(RoundedCornerShape(20.dp))
         .background(DriveColors.Gray100).clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(42.dp).background(DriveColors.White, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-            DriveIcon(DriveIconType.CAR, DriveColors.Black)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기",
-                style = MaterialTheme.typography.labelLarge, maxLines = 2)
-            Spacer(Modifier.height(4.dp))
-            Text(when { demo -> "데모 기록 사용 중"; connected -> "DRIVELOG 차량 연결됨"; else -> "차량 화면의 6자리 코드를 입력하세요" },
-                style = MaterialTheme.typography.labelMedium, color = DriveColors.SecondaryText, maxLines = 2)
-        }
-        DriveIcon(DriveIconType.CHEVRON, DriveColors.SecondaryText, Modifier.size(20.dp))
+        DriveIcon(DriveIconType.CAR, DriveColors.Black, Modifier.size(28.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기", Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
+            color = DriveColors.Black, maxLines = 1)
+        Spacer(Modifier.width(8.dp))
+        DriveIcon(DriveIconType.CHEVRON, DriveColors.Gray500, Modifier.size(20.dp))
     }
 }
 
@@ -109,7 +105,13 @@ import java.io.File
     val mapCache = remember(context) { RecentDriveMapCache.shared(context) }
     Box(Modifier.fillMaxWidth().heightIn(min = 250.dp).height(270.dp).clip(RoundedCornerShape(20.dp))
         .background(Color(0xff303030)).clickable(onClick = onDetail)) {
-        DriveRouteMapImage(record, mapCache, photo, photoVersion, Modifier.fillMaxSize(), creditAlignment = Alignment.TopStart)
+        if (record.route.size >= 2) {
+            DetailDriveRouteMap(record, mapCache, Modifier.fillMaxWidth().height(220.dp),
+                creditAlignment = Alignment.TopStart)
+        } else {
+            DriveRouteMapImage(record, mapCache, photo, photoVersion, Modifier.fillMaxSize(),
+                creditAlignment = Alignment.TopStart)
+        }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .08f),
             Color.Black.copy(alpha = .13f), Color.Black.copy(alpha = .83f)))))
         Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp)) {

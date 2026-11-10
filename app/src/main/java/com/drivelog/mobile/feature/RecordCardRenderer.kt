@@ -1,6 +1,8 @@
 ﻿package com.drivelog.mobile.feature
 
 import android.graphics.*
+import android.content.Context
+import com.drivelog.mobile.R
 import com.drivelog.mobile.data.RecordDto
 import com.drivelog.mobile.core.util.CropMath
 import com.drivelog.mobile.core.util.displayDuration
@@ -12,7 +14,7 @@ import kotlin.math.*
 
 /** Native port of the source project's server/static/m/card.js record templates. */
 object RecordCardRenderer {
-    fun render(r: RecordDto, photo: File, title: String, o: JSONObject, mapBackground: Bitmap? = null,
+    fun render(context: Context, r: RecordDto, photo: File, title: String, o: JSONObject, mapBackground: Bitmap? = null,
         blackTemplate: Boolean = false): Bitmap {
         val result = Bitmap.createBitmap(1200, 1600, Bitmap.Config.ARGB_8888)
         val c = Canvas(result)
@@ -25,6 +27,9 @@ object RecordCardRenderer {
         val routeFocus = template == "ROUTE"
         val dark = journal && o.optString("tone") == "mono-dark"
         val ink = if (blackTemplate) Color.BLACK else Color.WHITE
+        val hidePopup = o.optBoolean("previewHidePopupElements", false)
+        val popupOnly = o.optBoolean("previewPopupOverlayOnly", false)
+        val popupElement = o.optInt("previewPopupElement", -1)
         fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, width: Float = 968f,
                  align: Paint.Align = Paint.Align.LEFT, color: Int = ink) {
             p.shader = null; p.colorFilter = null; p.color = color; p.textSize = size
@@ -37,28 +42,30 @@ object RecordCardRenderer {
             }
             c.drawText(display, x, y, p)
         }
-        c.drawColor(if (dark) Color.BLACK else Color.WHITE)
-        val rect = RectF(0f,0f,1080f,1440f)
-        val bitmap = mapBackground ?: BitmapFactory.decodeFile(photo.path) ?: error("사진을 다시 선택해주세요")
-        try {
-            val crop = if (mapBackground == null) o.optJSONObject("crop") ?: JSONObject() else JSONObject()
-            val zoom = crop.optDouble("zoom",1.0).takeIf { it.isFinite() }?.coerceIn(1.0,3.0) ?: 1.0
-            fun pan(key: String) = crop.optDouble(key,0.0).takeIf { it.isFinite() }?.coerceIn(-1.0,1.0)?.toFloat() ?: 0f
-            val placement = CropMath.place(bitmap.width.toFloat(), bitmap.height.toFloat(),
-                rect.width(), rect.height(), zoom.toFloat(), pan("x"), pan("y"))
-            val x = rect.left + placement.left
-            val y = rect.top + placement.top
-            val tone = if (mapBackground == null) o.optString("tone", "color") else "color"
-            val matrix = when (tone) {
-                "mono", "mono-dark" -> ColorMatrix().apply { setSaturation(0f) }
-                "soft" -> ColorMatrix().apply { setSaturation(.72f) }
-                "film" -> ColorMatrix().apply { setSaturation(.62f) }
-                "warm" -> ColorMatrix(floatArrayOf(1.06f,0f,0f,0f,0f, 0f,1f,0f,0f,0f, 0f,0f,.88f,0f,0f, 0f,0f,0f,1f,0f))
-                else -> null
-            }
-            if (matrix != null) p.colorFilter = ColorMatrixColorFilter(matrix)
-            c.save(); c.clipRect(rect); c.drawBitmap(bitmap,null,RectF(x,y,x+placement.width,y+placement.height),p); c.restore(); p.colorFilter=null
-        } finally { if (mapBackground == null) bitmap.recycle() }
+        if (!popupOnly) {
+            c.drawColor(if (dark) Color.BLACK else Color.WHITE)
+            val rect = RectF(0f,0f,1080f,1440f)
+            val bitmap = mapBackground ?: BitmapFactory.decodeFile(photo.path) ?: error("사진을 다시 선택해주세요")
+            try {
+                val crop = if (mapBackground == null) o.optJSONObject("crop") ?: JSONObject() else JSONObject()
+                val zoom = crop.optDouble("zoom",1.0).takeIf { it.isFinite() }?.coerceIn(1.0,3.0) ?: 1.0
+                fun pan(key: String) = crop.optDouble(key,0.0).takeIf { it.isFinite() }?.coerceIn(-1.0,1.0)?.toFloat() ?: 0f
+                val placement = CropMath.place(bitmap.width.toFloat(), bitmap.height.toFloat(),
+                    rect.width(), rect.height(), zoom.toFloat(), pan("x"), pan("y"))
+                val x = rect.left + placement.left
+                val y = rect.top + placement.top
+                val tone = if (mapBackground == null) o.optString("tone", "color") else "color"
+                val matrix = when (tone) {
+                    "mono", "mono-dark" -> ColorMatrix().apply { setSaturation(0f) }
+                    "soft" -> ColorMatrix().apply { setSaturation(.72f) }
+                    "film" -> ColorMatrix().apply { setSaturation(.62f) }
+                    "warm" -> ColorMatrix(floatArrayOf(1.06f,0f,0f,0f,0f, 0f,1f,0f,0f,0f, 0f,0f,.88f,0f,0f, 0f,0f,0f,1f,0f))
+                    else -> null
+                }
+                if (matrix != null) p.colorFilter = ColorMatrixColorFilter(matrix)
+                c.save(); c.clipRect(rect); c.drawBitmap(bitmap,null,RectF(x,y,x+placement.width,y+placement.height),p); c.restore(); p.colorFilter=null
+            } finally { if (mapBackground == null) bitmap.recycle() }
+        }
         fun line(x1: Float, y1: Float, x2: Float, y2: Float, width: Float = 5f) {
             p.shader = null; p.colorFilter = null; p.color = ink; p.style = Paint.Style.STROKE; p.strokeWidth = width
             c.drawLine(x1, y1, x2, y2, p)
@@ -67,11 +74,11 @@ object RecordCardRenderer {
         p.color = ink
         p.textSize = 42f; p.textAlign = Paint.Align.LEFT
         p.typeface = Typeface.create(Typeface.DEFAULT,Typeface.BOLD_ITALIC)
-        c.drawText("DRIVELOG",56f,96f,p)
+        if (!popupOnly) c.drawText("DRIVELOG",56f,96f,p)
         val distance=r.distanceKm?.let { "%.1f km".format(Locale.KOREA,it) } ?: "정보 없음"
         val date=SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(r.startedAtMillis))
         val duration = r.displayDuration()
-        if (split) {
+        if (split && !o.optBoolean("previewHideFrameCorners", false)) {
             val edge = 84f
             val top=185f
             line(edge,top,edge+72f,top,9f); line(edge,top,edge,top+72f,9f)
@@ -79,21 +86,26 @@ object RecordCardRenderer {
             line(1080f-edge-72f,1440f-edge,1080f-edge,1440f-edge,9f)
             line(1080f-edge,1440f-edge-72f,1080f-edge,1440f-edge,9f)
         }
-        if (stat && o.optBoolean("showPlace",true)) {
+        if (stat && o.optBoolean("showPlace",true) && !hidePopup && popupElement in listOf(-1, 0)) {
             p.textSize=51f; p.typeface=Typeface.create(Typeface.DEFAULT,Typeface.BOLD)
             val markerX=(1020f-minOf(p.measureText(title),565f)-47f).coerceAtLeast(400f)
-            p.color=ink; p.style=Paint.Style.STROKE; p.strokeWidth=5f
-            c.drawCircle(markerX,83f,17f,p)
-            c.drawLine(markerX-13f,94f,markerX,120f,p)
-            c.drawLine(markerX+13f,94f,markerX,120f,p)
-            p.style=Paint.Style.FILL
+            val marker = BitmapFactory.decodeResource(context.resources, R.drawable.icon_focus_marker)
+            try {
+                p.colorFilter = PorterDuffColorFilter(ink, PorterDuff.Mode.SRC_IN)
+                c.drawBitmap(marker, null, RectF(markerX - 24f, 62f, markerX + 24f, 126f), p)
+            } finally {
+                p.colorFilter = null
+                marker.recycle()
+            }
             text(title,1020f,117f,51f,true,565f,Paint.Align.RIGHT)
         }
-        if (journal) {
-            text("Drive",56f,760f,112f,true)
-            text("Journal",56f,865f,112f,true)
-            line(56f,965f,440f,965f,6f)
-            if (o.optBoolean("showPlace",true)) text(title,56f,1120f,69f,true)
+        if (journal && !hidePopup) {
+            if (popupElement in listOf(-1, 0)) text("Drive",56f,760f,112f,true)
+            if (popupElement in listOf(-1, 1)) text("Journal",56f,865f,112f,true)
+            if (popupElement in listOf(-1, 2)) {
+                line(56f,965f,440f,965f,6f)
+                if (o.optBoolean("showPlace",true)) text(title,56f,1120f,69f,true)
+            }
         }
         if (split) {
             text("THE DRIVE",56f,1050f,38f,true)
@@ -157,9 +169,9 @@ object RecordCardRenderer {
         }
         when {
             stat -> {
-                line(106f,995f,106f,1295f,8f)
-                if (showDistance) text(distance,170f,1120f,120f,true,830f)
-                if (showTime) text(duration,170f,1285f,69f,true,820f)
+                if (!popupOnly) line(106f,995f,106f,1295f,8f)
+                if (!hidePopup && showDistance && popupElement in listOf(-1, 1)) text(distance,170f,1120f,120f,true,830f)
+                if (!hidePopup && showTime && popupElement in listOf(-1, 2)) text(duration,170f,1285f,69f,true,820f)
             }
             routeFocus -> {
                 val columns=listOfNotNull(if(showDistance) Pair(distance,0) else null,
@@ -175,9 +187,11 @@ object RecordCardRenderer {
                 }
             }
             journal -> {
-                val summary=listOfNotNull(if(o.optBoolean("showDate",true)) date else null,
-                    if(showDistance) distance else null,if(showTime) duration else null).joinToString(" · ")
-                text(summary,56f,1210f,39f,false,960f)
+                if (!hidePopup && popupElement in listOf(-1, 3)) {
+                    val summary=listOfNotNull(if(o.optBoolean("showDate",true)) date else null,
+                        if(showDistance) distance else null,if(showTime) duration else null).joinToString(" · ")
+                    text(summary,56f,1210f,39f,false,960f)
+                }
             }
             split -> {
                 val summary=listOfNotNull(if(showDistance) distance else null,if(showTime) duration else null).joinToString(" · ")
@@ -189,8 +203,10 @@ object RecordCardRenderer {
             }
         }
         val note=listOfNotNull(if(r.status=="PARTIAL") "불완전한 기록" else null,if(r.simulated) "시뮬레이션 데이터" else null).joinToString(" · ")
-        text(note,50f,1380f,22f)
-        if (mapBackground != null) text("OpenFreeMap · © OpenMapTiles · Data from OpenStreetMap", 50f, 1410f, 16f)
+        if (!popupOnly) {
+            text(note,50f,1380f,22f)
+            if (mapBackground != null) text("OpenFreeMap · © OpenMapTiles · Data from OpenStreetMap", 50f, 1410f, 16f)
+        }
         return result
     }
 }

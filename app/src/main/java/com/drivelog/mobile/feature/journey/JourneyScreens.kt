@@ -253,29 +253,53 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
 
 @Composable private fun DashboardDriveCard(record: RecordDto, photo: java.io.File?, photoVersion: Int,
     mapCache: RecentDriveMapCache, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().border(.5.dp, DriveColors.Gray300, RoundedCornerShape(16.dp))
-        .background(DriveColors.White, RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().height(104.dp).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            RecentDriveMapThumbnail(record, mapCache, photo, photoVersion, Modifier.size(76.dp, 82.dp))
-            Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f)) {
-                Text(record.displayDate(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray500)
-                Spacer(Modifier.height(5.dp))
-                Text(record.placeName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+        .border(.5.dp, DriveColors.Gray300, RoundedCornerShape(20.dp))
+        .background(DriveColors.White).clickable(onClick = onClick).padding(12.dp)) {
+        Row(Modifier.fillMaxWidth().height(92.dp), verticalAlignment = Alignment.CenterVertically) {
+            RecentDriveMapThumbnail(record, mapCache, photo, photoVersion,
+                Modifier.size(92.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                Text(record.displayDate(), style = MaterialTheme.typography.bodyMedium,
+                    color = DriveColors.Gray700, maxLines = 1)
+                Spacer(Modifier.height(3.dp))
+                Text(record.placeName, Modifier.padding(end = 20.dp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = DriveColors.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DriveRoadIcon(Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(record.distanceKm?.let { "${distance(it)} km" } ?: "—",
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                        color = DriveColors.Black, maxLines = 1)
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.width(1.dp).height(17.dp).background(DriveColors.Gray300))
+                    Spacer(Modifier.width(8.dp))
+                    DriveIcon(DriveIconType.CLOCK, DriveColors.Black, Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(duration(record.elapsedSeconds),
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                        color = DriveColors.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
-        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 16.dp, top = 5.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Text(record.distanceKm?.let { distance(it) } ?: "—", Modifier.width(90.dp).alignByBaseline(),
-                    style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                Text(duration(record.elapsedSeconds), Modifier.weight(1f).alignByBaseline(),
-                    style = MaterialTheme.typography.titleLarge, maxLines = 1)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                Text("KM", Modifier.width(90.dp).alignByBaseline(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray500)
-                Text("운행시간", Modifier.weight(1f).alignByBaseline(), style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray500)
-            }
-        }
+        DriveIcon(DriveIconType.CHEVRON, DriveColors.Black,
+            Modifier.align(Alignment.CenterEnd).size(18.dp))
+    }
+}
+
+@Composable private fun DriveRoadIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val stroke = 1.5.dp.toPx()
+        drawLine(DriveColors.Black, Offset(size.width * .30f, size.height * .08f),
+            Offset(size.width * .04f, size.height * .92f), stroke)
+        drawLine(DriveColors.Black, Offset(size.width * .70f, size.height * .08f),
+            Offset(size.width * .96f, size.height * .92f), stroke)
+        drawLine(DriveColors.Black, Offset(size.width * .50f, size.height * .10f),
+            Offset(size.width * .50f, size.height * .92f), stroke,
+            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(stroke * 2, stroke * 2)))
     }
 }
 
@@ -326,8 +350,6 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             Text("다음 레벨까지 ${distance((1000.0 - totalKm).coerceAtLeast(0.0))}km 남음",
                 style = MaterialTheme.typography.labelSmall, color = DriveColors.Gray300)
         }
-        Text("DRIVELOG  DEMO", Modifier.align(Alignment.TopEnd).background(Color(0xFFC8FF19), RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = DriveColors.Black)
     }
 }
 
@@ -423,8 +445,8 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
             Text(record.placeName, style = MaterialTheme.typography.displayLarge)
             Spacer(Modifier.height(14.dp))
             Spacer(Modifier.height(24.dp))
-            DriveRouteMapImage(record, mapCache, null, 0,
-                Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(22.dp)), showEmptyMessage = true)
+            DetailDriveRouteMap(record, mapCache,
+                Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(22.dp)))
             Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 JourneyMetric(R.drawable.ic_car, "거리", record.displayDistance(), Modifier.weight(1f))

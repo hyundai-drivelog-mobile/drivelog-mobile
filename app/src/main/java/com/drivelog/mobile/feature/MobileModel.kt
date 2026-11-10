@@ -10,9 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.drivelog.mobile.BuildConfig
 import com.drivelog.mobile.MainActivity
 import com.drivelog.mobile.data.*
-import com.drivelog.mobile.feature.common.DrivePhotoAsset
-import com.drivelog.mobile.feature.journey.RecentDriveMapCache
-import com.drivelog.mobile.feature.journey.cardMapPoints
+import com.drivelog.mobile.feature.editor.EditorThumbnailAsset
 import com.drivelog.mobile.feature.wash.WashResponseMapper
 import com.drivelog.mobile.feature.wash.WashRegion
 import com.drivelog.mobile.feature.wash.WashUiState
@@ -159,14 +157,10 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     fun export(uri: Uri, record: RecordDto, title: String, settings: JSONObject,
         blackTemplate: Boolean = false) = task {
         val selectedPhoto = photo(record.id)
-        val map = if (!selectedPhoto.exists()) {
-            val points = cardMapPoints(record, settings.optBoolean("showRoute", true) && settings.optBoolean("trimEnds", true))
-            if (points.size >= 2) RecentDriveMapCache.shared(context).load(record, points, 900, 1200,
-                includeRoute = false) else null
-        } else null
         withContext(Dispatchers.IO) {
-            val source = if (selectedPhoto.exists()) selectedPhoto else DrivePhotoAsset.file(context)
-            val bitmap = Cards.render(record, source, title, settings, map, blackTemplate)
+            val source = if (selectedPhoto.exists()) selectedPhoto else EditorThumbnailAsset.file(context)
+            val bitmap = Cards.render(context, record, source, title, settings,
+                blackTemplate = blackTemplate)
             try { context.contentResolver.openOutputStream(uri)?.use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) } ?: error("저장 실패") }
             finally { bitmap.recycle() }
         }

@@ -6,7 +6,7 @@ import android.graphics.BitmapFactory
 import com.drivelog.mobile.R
 import java.io.File
 
-/** Bundled photo used only for the editor's filter and layout choices. */
+/** Bundled photo used by editor previews and cards without a selected photo. */
 internal object EditorThumbnailAsset {
     @Volatile private var copiedFile: File? = null
 

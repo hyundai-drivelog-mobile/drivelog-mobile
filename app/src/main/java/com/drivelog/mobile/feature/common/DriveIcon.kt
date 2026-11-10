@@ -1,6 +1,7 @@
 package com.drivelog.mobile.feature.common
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -9,11 +10,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.drivelog.mobile.R
 
 enum class DriveIconType { CAR, BELL, HOME, LIST, PERSON, ROUTE, AWARD, LOCK, CLOCK, FUEL, CHEVRON }
 
 @Composable fun DriveIcon(type: DriveIconType, color: Color, modifier: Modifier = Modifier) {
+    val image = when (type) {
+        DriveIconType.CAR -> R.drawable.icon_vehicle_connection
+        DriveIconType.ROUTE -> R.drawable.icon_recommended_course
+        DriveIconType.AWARD -> R.drawable.icon_achievement
+        DriveIconType.BELL -> R.drawable.icon_notification
+        DriveIconType.HOME -> R.drawable.icon_tab_home
+        DriveIconType.LIST -> R.drawable.icon_tab_records
+        DriveIconType.PERSON -> R.drawable.icon_tab_profile
+        else -> null
+    }
+    if (image != null) {
+        Image(painterResource(image), null, modifier.size(24.dp), colorFilter = ColorFilter.tint(color))
+        return
+    }
     Canvas(modifier.size(24.dp)) {
         val sx = size.width / 24f; val sy = size.height / 24f
         fun p(x: Float, y: Float) = Offset(x * sx, y * sy)

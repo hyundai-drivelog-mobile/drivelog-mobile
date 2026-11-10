@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -27,9 +28,10 @@ import kotlinx.coroutines.withContext
 
 @Composable fun FinalPreviewScreen(record: RecordDto, draft: CardDraft, photo: File?, photoVersion: Int,
     onBack: () -> Unit, onSavePng: () -> Unit) {
+    val context = LocalContext.current
     val rendered by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, record.id, draft, photoVersion) {
         value = if (photo?.exists() == true) withContext(Dispatchers.IO) {
-            runCatching { Cards.render(record, photo, draft.title.ifBlank { record.placeName }, draft.toSettings(),
+            runCatching { Cards.render(context, record, photo, draft.title.ifBlank { record.placeName }, draft.toSettings(),
                 blackTemplate = draft.blackTemplate).asImageBitmap() }.getOrNull()
         } else null
     }

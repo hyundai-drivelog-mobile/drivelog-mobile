@@ -1,43 +1,25 @@
 package com.drivelog.mobile.feature.wash
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.drivelog.mobile.R
 import com.drivelog.mobile.ui.theme.DriveColors
 
 @Composable fun WashSparkleCarIcon(modifier: Modifier = Modifier, color: Color = DriveColors.Black) {
-    Canvas(modifier.size(28.dp)) {
-        val u = size.minDimension / 28f
-        val stroke = 1.7.dp.toPx()
-        fun p(x: Float, y: Float) = Offset(x * u, y * u)
-        val car = Path().apply {
-            moveTo(3f * u, 17f * u)
-            lineTo(5f * u, 13f * u)
-            lineTo(8f * u, 11f * u)
-            lineTo(19f * u, 11f * u)
-            lineTo(22f * u, 14f * u)
-            lineTo(25f * u, 16f * u)
-            lineTo(25f * u, 21f * u)
-            lineTo(3f * u, 21f * u)
-            close()
-        }
-        drawPath(car, color, style = Stroke(stroke, cap = StrokeCap.Round))
-        drawLine(color, p(5f, 16f), p(23f, 16f), stroke, StrokeCap.Round)
-        drawCircle(color, 2f * u, p(8f, 21f), style = Stroke(stroke))
-        drawCircle(color, 2f * u, p(20f, 21f), style = Stroke(stroke))
-        drawLine(color, p(21f, 2f), p(21f, 9f), stroke, StrokeCap.Round)
-        drawLine(color, p(17.5f, 5.5f), p(24.5f, 5.5f), stroke, StrokeCap.Round)
-        drawLine(color, p(14f, 2f), p(14f, 6f), stroke * .8f, StrokeCap.Round)
-        drawLine(color, p(12f, 4f), p(16f, 4f), stroke * .8f, StrokeCap.Round)
-    }
+    Image(painterResource(R.drawable.icon_today_wash), null, modifier.size(28.dp),
+        colorFilter = ColorFilter.tint(color))
 }
 
 @Composable fun WashDropIcon(modifier: Modifier = Modifier, color: Color = DriveColors.Black) {

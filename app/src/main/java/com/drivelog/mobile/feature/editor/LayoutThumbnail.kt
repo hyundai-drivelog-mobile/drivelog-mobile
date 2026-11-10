@@ -34,7 +34,7 @@ import kotlinx.coroutines.withContext
     val thumbnail by produceState<ImageBitmap?>(null, record, previewDraft, context) {
         value = withContext(Dispatchers.Default) {
             val source = EditorThumbnailAsset.file(context)
-            val rendered = Cards.render(record, source,
+            val rendered = Cards.render(context, record, source,
                 previewDraft.title.ifBlank { record.placeName }, previewDraft.toSettings(),
                 blackTemplate = previewDraft.blackTemplate)
             try {
