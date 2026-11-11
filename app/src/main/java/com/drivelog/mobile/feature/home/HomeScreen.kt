@@ -32,9 +32,9 @@ import com.drivelog.mobile.feature.wash.WashSparkleCarIcon
 import com.drivelog.mobile.ui.theme.*
 import java.io.File
 
-@Composable fun HomeScreen(records: List<RecordDto>, demo: Boolean, connected: Boolean,
+@Composable fun HomeScreen(records: List<RecordDto>, demo: Boolean,
     photoFor: (String) -> File?, photoVersion: Int, onList: () -> Unit, onDetail: (String) -> Unit,
-    onEditor: (String) -> Unit, onLogin: () -> Unit, onVehicle: () -> Unit, onNotifications: () -> Unit,
+    onEditor: (String) -> Unit, onLogin: () -> Unit, onNotifications: () -> Unit,
     onWash: () -> Unit, onStamps: () -> Unit = onLogin) {
     val recent = records.maxByOrNull { it.startedAtMillis }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = DriveDimens.Page, end = DriveDimens.Page, bottom = 28.dp)) {
@@ -47,8 +47,6 @@ import java.io.File
                 }
             }
             Spacer(Modifier.height(10.dp))
-            VehicleConnectionCard(connected, onVehicle)
-            Spacer(Modifier.height(28.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("최근 드라이브", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                 TextButton(onList) {
@@ -78,20 +76,6 @@ import java.io.File
         WashSparkleCarIcon(Modifier.size(28.dp))
         Spacer(Modifier.width(16.dp))
         Text("오늘의 세차", Modifier.weight(1f),
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
-            color = DriveColors.Black, maxLines = 1)
-        Spacer(Modifier.width(8.dp))
-        DriveIcon(DriveIconType.CHEVRON, DriveColors.Gray500, Modifier.size(20.dp))
-    }
-}
-
-@Composable private fun VehicleConnectionCard(connected: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).clip(RoundedCornerShape(20.dp))
-        .background(DriveColors.Gray100).clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        DriveIcon(DriveIconType.CAR, DriveColors.Black, Modifier.size(28.dp))
-        Spacer(Modifier.width(16.dp))
-        Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기", Modifier.weight(1f),
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
             color = DriveColors.Black, maxLines = 1)
         Spacer(Modifier.width(8.dp))
@@ -154,5 +138,5 @@ import java.io.File
 }
 
 @Preview @Composable private fun HomePreview() { DRIVELOGMobileTheme {
-    HomeScreen(DemoJourneys.records, true, false, { null }, 0, {}, {}, {}, {}, {}, {}, {})
+    HomeScreen(DemoJourneys.records, true, { null }, 0, {}, {}, {}, {}, {}, {}, {})
 } }

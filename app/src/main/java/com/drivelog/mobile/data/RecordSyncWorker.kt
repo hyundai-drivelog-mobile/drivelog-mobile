@@ -9,6 +9,7 @@ class RecordSyncWorker(context: Context, parameters: WorkerParameters) : Worker(
     override fun doWork(): Result {
         val vault = TokenStore(applicationContext)
         val token = try { vault.read() } catch (_: Exception) { return Result.failure() } ?: return Result.success()
+        if (!ConnectionConsent(applicationContext).hasAgreed(token)) return Result.success()
         val account = RecordArrivals.account(token)
         val prefs = applicationContext.getSharedPreferences("sync-$account", Context.MODE_PRIVATE)
         if (prefs.getBoolean("unauthorized", false)) return Result.success()
@@ -35,6 +36,9 @@ class RecordSyncWorker(context: Context, parameters: WorkerParameters) : Worker(
         catch (_: Exception) { Result.failure() }
     }
     companion object {
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork("record-sync")
+        }
         fun schedule(context: Context) {
             val work = PeriodicWorkRequestBuilder<RecordSyncWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())

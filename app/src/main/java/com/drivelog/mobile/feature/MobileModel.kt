@@ -23,9 +23,11 @@ import org.json.JSONObject
 class MobileModel(application: Application) : AndroidViewModel(application) {
     private val context = application
     private val vault = TokenStore(context)
+    private val connectionConsent = ConnectionConsent(context)
     private var token = runCatching { vault.read() }.getOrNull()
     private val api = DriveLogApi(BuildConfig.API_URL) { token }
-    var connected by mutableStateOf(token != null); private set
+    var pendingConsent by mutableStateOf(token != null && !connectionConsent.hasAgreed(token!!)); private set
+    var connected by mutableStateOf(token != null && !pendingConsent); private set
     var records by mutableStateOf(emptyList<RecordDto>()); private set
     var stamps by mutableStateOf(emptyList<StampDto>()); private set
     var stampsLoaded by mutableStateOf(false); private set
@@ -41,12 +43,16 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
     private var washBusy = false
     private var washLastAttemptAt = 0L
     private var retryAt = 0L
-    init { if (connected) RecordSyncWorker.schedule(context); viewModelScope.launch { records = withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).read() } } }
+    private var connectionCleanup: Job? = null
+    init { if (connected) {
+        RecordSyncWorker.schedule(context)
+        viewModelScope.launch { records = withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).read() } }
+    } }
     private fun scopeId() = MessageDigest.getInstance("SHA-256").digest((token ?: "unlinked").toByteArray()).joinToString("") { "%02x".format(it) }
     init {
         val initialToken = token
         val cache = File(directory(), "stamps.json")
-        viewModelScope.launch {
+        if (connected) viewModelScope.launch {
             val saved = withContext(Dispatchers.IO) { StampCache(cache).read() }
             if (token == initialToken && !stampsLoaded) { stamps = saved; stampsLoaded = cache.exists() }
         }
@@ -79,9 +85,40 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun claim(code: String) = task {
+        connectionCleanup?.join()
         val next = withContext(Dispatchers.IO) { api.claim(code).also { vault.write(it) } }
         if (next != token) { records = emptyList(); stamps = emptyList(); stampsLoaded = false; selected = null; context.getSystemService(NotificationManager::class.java).cancelAll() }
-        token = next; connected = true; context.getSharedPreferences("sync-${scopeId()}", Context.MODE_PRIVATE).edit().remove("unauthorized").apply(); RecordSyncWorker.schedule(context); syncNow()
+        withContext(Dispatchers.IO) { connectionConsent.agree(next) }
+        token = next; pendingConsent = false; connected = true
+        context.getSharedPreferences("sync-${scopeId()}", Context.MODE_PRIVATE).edit().remove("unauthorized").apply()
+        RecordSyncWorker.schedule(context); syncNow()
+    }
+    fun agreeExistingConnection() {
+        val existing = token ?: return
+        if (!pendingConsent) return
+        task {
+            withContext(Dispatchers.IO) { connectionConsent.agree(existing) }
+            if (token != existing) return@task
+            pendingConsent = false; connected = true
+            RecordSyncWorker.schedule(context)
+            records = withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).read() }
+            syncNow()
+        }
+    }
+    fun unlink() {
+        val oldToken = token ?: return
+        val account = scopeId()
+        vault.clear()
+        token = null; connected = false; pendingConsent = false
+        records = emptyList(); stamps = emptyList(); stampsLoaded = false; selected = null
+        RecordSyncWorker.cancel(context)
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+        connectionCleanup = viewModelScope.launch(Dispatchers.IO) {
+            connectionConsent.forget(oldToken)
+            context.getSharedPreferences("arrivals-$account", Context.MODE_PRIVATE).edit().clear().commit()
+            context.getSharedPreferences("sync-$account", Context.MODE_PRIVATE).edit().clear().commit()
+            File(context.noBackupFilesDir, account).deleteRecursively()
+        }
     }
     fun sync() { if (connected) task { syncNow() } }
     fun syncStamps() { if (connected) task { syncStampsNow() } }
@@ -103,6 +140,7 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
         refreshWash()
     }
     fun refreshWash() {
+        if (!connected) return
         val now = System.currentTimeMillis()
         if (washBusy || now - washLastAttemptAt < 5 * 60_000L) return
         washBusy = true
@@ -128,9 +166,13 @@ class MobileModel(application: Application) : AndroidViewModel(application) {
         }
     }
     private suspend fun syncNow() {
+        val requestedToken = token ?: return
         val fresh = withContext(Dispatchers.IO) { api.journey() }
+        if (token != requestedToken || !connected) return
         val newRecords = withContext(Dispatchers.IO) { RecordArrivals.accept(context, scopeId(), fresh) }
+        if (token != requestedToken || !connected) return
         withContext(Dispatchers.IO) { RecordCache(File(directory(), "records.json")).write(fresh) }
+        if (token != requestedToken || !connected) return
         records = fresh
         if (newRecords.isNotEmpty()) {
             message = "새 기록 ${newRecords.size}건에 사진을 추가해보세요."

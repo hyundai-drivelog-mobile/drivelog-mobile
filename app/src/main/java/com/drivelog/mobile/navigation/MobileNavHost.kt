@@ -1,13 +1,18 @@
 package com.drivelog.mobile.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -55,7 +60,13 @@ private object Route {
     val currentEntry by nav.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        scope.launch {
+            snackbar.showSnackbar(if (granted) "새 기록 알림을 받을 수 있어요" else "알림을 허용하지 않아도 기록을 볼 수 있어요")
+        }
+    }
     var demo by remember { mutableStateOf(false) }
     var showLogin by remember { mutableStateOf(false) }
     var premiumUnlocked by remember { mutableStateOf(false) }
@@ -126,17 +137,22 @@ private object Route {
                 }
             }
             composable(Route.Link) {
-                VehicleLinkScreen(model.busy, model.message, model::claim) {
+                VehicleLinkScreen(model.busy, model.message, model::claim, {
                     demo = true
                     nav.navigate(Route.Home) { popUpTo(Route.Link) { inclusive = true } }
-                }
+                }, model.pendingConsent, model::agreeExistingConnection)
             }
             composable(Route.Home) {
                 LaunchedEffect(Unit) { model.refreshWash() }
-                HomeScreen(records, demo, model.connected, { model.photo(it) }, model.photoVersion,
+                HomeScreen(records, demo, { model.photo(it) }, model.photoVersion,
                     { openTopLevel(Route.List) }, { nav.navigate(Route.detail(it)) }, ::edit,
-                    { showLogin = true }, { nav.navigate(Route.Link) },
-                    { scope.launch { snackbar.showSnackbar("새 주행 기록은 기록 화면에서 확인할 수 있어요") } },
+                    { showLogin = true },
+                    {
+                        if (model.connected && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                        ) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        else scope.launch { snackbar.showSnackbar("새 주행 기록은 기록 화면에서 확인할 수 있어요") }
+                    },
                     {
                         if (nav.currentDestination?.route == Route.Home) {
                             nav.navigate(Route.WashDetail) { launchSingleTop = true }
@@ -157,7 +173,11 @@ private object Route {
                 JourneyListScreen(records, { nav.popBackStack() }, { nav.navigate(Route.detail(it)) }, { if (!demo) model.sync() }, { model.photo(it) }, model.photoVersion)
             }
             composable(Route.Profile) {
-                ProfileScreen(model.connected, demo, { nav.navigate(Route.Link) }, { showLogin = true })
+                ProfileScreen(model.connected, demo, { nav.navigate(Route.Link) }, { showLogin = true },
+                    model.busy, {
+                        model.unlink()
+                        nav.navigate(Route.Link) { popUpTo(Route.Profile) { inclusive = true } }
+                    })
             }
             composable(Route.Detail, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                 model.photoVersion
