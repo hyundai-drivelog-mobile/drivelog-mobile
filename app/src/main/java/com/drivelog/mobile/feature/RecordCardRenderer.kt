@@ -33,6 +33,7 @@ object RecordCardRenderer {
         fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, width: Float = 968f,
                  align: Paint.Align = Paint.Align.LEFT, color: Int = ink) {
             p.shader = null; p.colorFilter = null; p.color = color; p.textSize = size
+            p.style = Paint.Style.FILL
             p.textAlign = align
             p.typeface = if (bold) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
             var display = value
@@ -41,6 +42,19 @@ object RecordCardRenderer {
                 display += "…"
             }
             c.drawText(display, x, y, p)
+        }
+        fun displayMetric(x: Float, baseline: Float, numberSize: Float, unitSize: Float) {
+            val number = r.distanceKm?.let { "%.1f".format(Locale.KOREA, it) } ?: "—"
+            p.shader = null; p.colorFilter = null; p.color = ink; p.textAlign = Paint.Align.LEFT
+            p.style = Paint.Style.FILL
+            p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
+            p.textSize = numberSize
+            val width = p.measureText(number)
+            c.drawText(number, x, baseline, p)
+            if (r.distanceKm != null) {
+                p.textSize = unitSize
+                c.drawText("km", x + width + 12f, baseline - 14f, p)
+            }
         }
         if (!popupOnly) {
             c.drawColor(if (dark) Color.BLACK else Color.WHITE)
@@ -77,6 +91,7 @@ object RecordCardRenderer {
         if (!popupOnly) c.drawText("DRIVELOG",56f,96f,p)
         val distance=r.distanceKm?.let { "%.1f km".format(Locale.KOREA,it) } ?: "정보 없음"
         val date=SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(r.startedAtMillis))
+        val editorialDate=SimpleDateFormat("MMM dd, yyyy",Locale.ENGLISH).format(Date(r.startedAtMillis)).uppercase(Locale.ENGLISH)
         val duration = r.displayDuration()
         if (split && !o.optBoolean("previewHideFrameCorners", false)) {
             val edge = 84f
@@ -86,18 +101,28 @@ object RecordCardRenderer {
             line(1080f-edge-72f,1440f-edge,1080f-edge,1440f-edge,9f)
             line(1080f-edge,1440f-edge-72f,1080f-edge,1440f-edge,9f)
         }
-        if (stat && o.optBoolean("showPlace",true) && !hidePopup && popupElement in listOf(-1, 0)) {
-            p.textSize=51f; p.typeface=Typeface.create(Typeface.DEFAULT,Typeface.BOLD)
-            val markerX=(1020f-minOf(p.measureText(title),565f)-47f).coerceAtLeast(400f)
-            val marker = BitmapFactory.decodeResource(context.resources, R.drawable.icon_focus_marker)
-            try {
-                p.colorFilter = PorterDuffColorFilter(ink, PorterDuff.Mode.SRC_IN)
-                c.drawBitmap(marker, null, RectF(markerX - 24f, 62f, markerX + 24f, 126f), p)
-            } finally {
-                p.colorFilter = null
-                marker.recycle()
+        if (stat) {
+            if (!hidePopup && popupElement in listOf(-1, 1)) {
+                text("오늘도, 길 위에서 만난 새로운 풍경", 86f, 535f, 38f, false, 900f)
+                if (o.optBoolean("showDate", true)) text(editorialDate, 86f, 620f, 38f, true, 900f)
             }
-            text(title,1020f,117f,51f,true,565f,Paint.Align.RIGHT)
+            if (!hidePopup && popupElement in listOf(-1, 2)) {
+                if (o.optBoolean("showPlace", true)) {
+                    p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    p.textSize = 76f
+                    val ruleWidth = p.measureText(title).coerceIn(220f, 900f)
+                    line(86f, 1110f, 86f + ruleWidth, 1110f, 5f)
+                    text(title, 86f, 1250f, 76f, true, 900f)
+                }
+            }
+        }
+        if (routeFocus) {
+            if (!popupOnly) {
+                line(348f, 99f, 752f, 99f, 3f)
+                if (o.optBoolean("showDate", true)) text(editorialDate, 1030f, 110f, 35f, true, 260f, Paint.Align.RIGHT)
+            }
+            if (o.optBoolean("showPlace", true)) text("출발  →  $title", 86f, 345f, 82f, true, 940f)
+            text("익숙한 도심을 지나, 새로운 풍경으로", 86f, 425f, 38f, false, 920f)
         }
         if (journal && !hidePopup) {
             if (popupElement in listOf(-1, 0)) text("Drive",56f,760f,112f,true)
@@ -118,38 +143,49 @@ object RecordCardRenderer {
                 text(words[1],56f,1140f,125f,true,930f)
             } else text(title,56f,1110f,125f,true,930f)
         }
-        if (routeFocus && o.optBoolean("showRoute",true)) {
+        if (routeFocus) {
             var route=r.route.filter { it.latitude.isFinite() && it.longitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude in -180.0..180.0 }
             if (o.optBoolean("trimEnds",true) && route.size>=12) { val cut=max(1,(route.size*.1).roundToInt()); route=route.drop(cut).dropLast(cut) }
-            val box=RectF(100f,300f,980f,1000f)
-            if(route.size<2) { text("경로 정보 없음",box.centerX(),box.centerY(),28f,false,box.width(),Paint.Align.CENTER) } else {
+            val box=RectF(150f,535f,930f,850f)
+            if(route.size<2) {
+                if (o.optBoolean("showRoute", true))
+                    text("경로 정보 없음",box.centerX(),box.centerY(),28f,false,box.width(),Paint.Align.CENTER)
+            } else {
                 val k=cos(Math.toRadians(route.map { it.latitude }.average()))
                 val xs=route.map { it.longitude*k }; val ys=route.map { -it.latitude }
                 val minX=xs.min(); val minY=ys.min(); val dx=max(1e-7,xs.max()-minX); val dy=max(1e-7,ys.max()-minY)
                 val scale=min(box.width()/dx,box.height()/dy)
                 val ox=box.left+(box.width()-dx*scale)/2; val oy=box.top+(box.height()-dy*scale)/2
-                p.color=ink; p.strokeWidth=13f; p.strokeCap=Paint.Cap.ROUND; p.style=Paint.Style.STROKE
                 val pixels=route.indices.map { index ->
                     PointF((ox+(xs[index]-minX)*scale).toFloat(),(oy+(ys[index]-minY)*scale).toFloat())
                 }
-                for(i in 1 until route.size) {
-                    val gap=route[i].epochMillis-route[i-1].epochMillis
-                    if(gap<0) continue
-                    val previous=pixels[(i-2).coerceAtLeast(0)]
-                    val start=pixels[i-1]
-                    val end=pixels[i]
-                    val next=pixels[(i+1).coerceAtMost(pixels.lastIndex)]
-                    val path=Path().apply {
-                        moveTo(start.x,start.y)
-                        cubicTo(start.x+(end.x-previous.x)/6f,start.y+(end.y-previous.y)/6f,
-                            end.x-(next.x-start.x)/6f,end.y-(next.y-start.y)/6f,end.x,end.y)
+                if (o.optBoolean("showRoute", true) && !o.optBoolean("previewHideRouteStroke", false)) {
+                    p.color=ink; p.strokeWidth=13f; p.strokeCap=Paint.Cap.ROUND; p.style=Paint.Style.STROKE
+                    for(i in 1 until route.size) {
+                        val gap=route[i].epochMillis-route[i-1].epochMillis
+                        if(gap<0) continue
+                        val previous=pixels[(i-2).coerceAtLeast(0)]
+                        val start=pixels[i-1]
+                        val end=pixels[i]
+                        val next=pixels[(i+1).coerceAtMost(pixels.lastIndex)]
+                        val path=Path().apply {
+                            moveTo(start.x,start.y)
+                            cubicTo(start.x+(end.x-previous.x)/6f,start.y+(end.y-previous.y)/6f,
+                                end.x-(next.x-start.x)/6f,end.y-(next.y-start.y)/6f,end.x,end.y)
+                        }
+                        c.drawPath(path,p)
                     }
-                    c.drawPath(path,p)
+                    p.pathEffect=null; p.style=Paint.Style.FILL
+                    c.drawCircle(pixels.first().x,pixels.first().y,17f,p)
+                    p.style=Paint.Style.STROKE; p.strokeWidth=7f
+                    c.drawCircle(pixels.last().x,pixels.last().y,21f,p); p.style=Paint.Style.FILL
                 }
-                p.pathEffect=null; p.style=Paint.Style.FILL
-                c.drawCircle(pixels.first().x,pixels.first().y,17f,p)
-                p.style=Paint.Style.STROKE; p.strokeWidth=7f
-                c.drawCircle(pixels.last().x,pixels.last().y,21f,p); p.style=Paint.Style.FILL
+                if (o.optBoolean("showRoute", true)) {
+                    val start=pixels.first(); val end=pixels.last()
+                    text("출발", start.x.coerceIn(86f, 820f), (start.y+65f).coerceAtMost(960f), 42f, false, 190f)
+                    if (o.optBoolean("showPlace", true))
+                        text(title, end.x.coerceIn(86f, 760f), (end.y+65f).coerceAtMost(960f), 42f, false, 260f)
+                }
             }
         }
         val showDistance=o.optBoolean("showDistance",true)
@@ -169,22 +205,11 @@ object RecordCardRenderer {
         }
         when {
             stat -> {
-                if (!popupOnly) line(106f,995f,106f,1295f,8f)
-                if (!hidePopup && showDistance && popupElement in listOf(-1, 1)) text(distance,170f,1120f,120f,true,830f)
-                if (!hidePopup && showTime && popupElement in listOf(-1, 2)) text(duration,170f,1285f,69f,true,820f)
+                if (!hidePopup && showDistance && popupElement in listOf(-1, 0))
+                    displayMetric(78f, 435f, 300f, 72f)
             }
             routeFocus -> {
-                val columns=listOfNotNull(if(showDistance) Pair(distance,0) else null,
-                    if(showTime) Pair(duration,1) else null,Pair("정보 없음",2))
-                columns.forEachIndexed { index, item ->
-                    val x=if (columns.size == 3) 210f+330f*index
-                        else 130f+(820f*(index+.5f)/columns.size)
-                    when(item.second) { 0 -> car(x,1200f,1.25f); 1 -> clock(x,1200f,1.25f); else -> {
-                        p.color=ink; p.style=Paint.Style.STROKE; p.strokeWidth=5f
-                        c.drawRoundRect(x-22f,1169f,x+18f,1231f,5f,5f,p); p.style=Paint.Style.FILL
-                    } }
-                    text(item.first,x,1330f,54f,true,250f,Paint.Align.CENTER)
-                }
+                if (showDistance) text(distance, 86f, 1330f, 98f, true, 900f)
             }
             journal -> {
                 if (!hidePopup && popupElement in listOf(-1, 3)) {

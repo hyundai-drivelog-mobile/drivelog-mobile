@@ -30,4 +30,5 @@ class TokenStore(context: Context) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         check(prefs.edit().putString("cipher", Base64.encodeToString(cipher.iv + cipher.doFinal(token.toByteArray()), Base64.NO_WRAP)).commit())
     }
+    fun clear() { check(prefs.edit().remove("cipher").commit()) }
 }

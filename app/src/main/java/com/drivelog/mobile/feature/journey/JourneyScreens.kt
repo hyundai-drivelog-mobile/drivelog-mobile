@@ -361,14 +361,10 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
     var selectedAnchor by rememberSaveable(latestAnchor) { mutableLongStateOf(latestAnchor) }
     var pickerPeriod by remember { mutableStateOf<DrivePeriod?>(null) }
     Column(Modifier.fillMaxSize()) {
-        var searching by remember { mutableStateOf(false) }
-        var query by remember { mutableStateOf("") }
         Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = DriveDimens.Page), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             BackButton(onBack)
             Text("드라이브 기록", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-            IconButton({ searching = !searching }) { Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_search), "기록 검색", tint = DriveColors.Gray500) }
         }
-        if (searching) OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = DriveDimens.Page), singleLine = true, placeholder = { Text("코스명 검색") })
         Row(Modifier.fillMaxWidth().padding(horizontal = DriveDimens.Page).border(.5.dp, DriveColors.Gray300, RoundedCornerShape(50))
             .background(DriveColors.White, RoundedCornerShape(50))) {
             DrivePeriod.entries.forEach { period ->
@@ -386,7 +382,7 @@ private fun duration(seconds: Long): String = if (seconds >= 3600) "${seconds / 
         val start = periodStart(selectedPeriod, selectedAnchor)
         val end = periodEnd(selectedPeriod, start)
         val periodRecords = records.filter { it.startedAtMillis >= start && it.startedAtMillis < end }
-        val visibleRecords = periodRecords.filter { it.placeName.contains(query, ignoreCase = true) }.sortedByDescending { it.startedAtMillis }
+        val visibleRecords = periodRecords.sortedByDescending { it.startedAtMillis }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = DriveDimens.Page)) {
             Spacer(Modifier.height(30.dp))
             DriveOverview(periodRecords, selectedPeriod, selectedAnchor, records, { pickerPeriod = selectedPeriod })

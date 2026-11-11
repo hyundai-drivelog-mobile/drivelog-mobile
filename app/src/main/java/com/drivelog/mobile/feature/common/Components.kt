@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.drivelog.mobile.R
 import com.drivelog.mobile.core.designsystem.DriveDimens
 import com.drivelog.mobile.core.util.*
@@ -69,6 +71,20 @@ import com.drivelog.mobile.ui.theme.DriveColors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         if (action != null && onAction != null) DriveGhostButton(action, onAction)
+    }
+}
+
+@Composable fun VehicleConnectionCard(connected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).clip(RoundedCornerShape(20.dp))
+        .background(DriveColors.Gray100).clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        DriveIcon(DriveIconType.CAR, DriveColors.Black, Modifier.size(28.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(if (connected) "차량이 연결되어 있어요" else "차량 연결하기", Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
+            color = DriveColors.Black, maxLines = 1)
+        Spacer(Modifier.width(8.dp))
+        DriveIcon(DriveIconType.CHEVRON, DriveColors.Gray500, Modifier.size(20.dp))
     }
 }
 
