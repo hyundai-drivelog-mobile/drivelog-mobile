@@ -111,13 +111,18 @@ private fun isTemplateElementAt(position: Offset, width: Int, height: Int,
     val x = position.x * 1080f / width
     val y = position.y * 1440f / height
     if (x in 35f..370f && y in 35f..130f) return true
-    if (draft.showDate && x in 690f..1045f && y in 35f..125f) return true
+    val dateArea = when (draft.layout) {
+        CardLayout.STAT -> x in 70f..650f && y in 575f..650f
+        CardLayout.ROUTE -> x in 755f..1045f && y in 55f..130f
+        else -> x in 690f..1045f && y in 35f..125f
+    }
+    if (draft.showDate && dateArea) return true
     val titleArea = when (draft.layout) {
         CardLayout.PHOTO -> x in 35f..1045f && y in 975f..1160f
         CardLayout.JOURNAL -> x in 35f..1045f && y in 1000f..1140f
         CardLayout.SPLIT -> x in 35f..1045f && y in 1040f..1170f
-        CardLayout.STAT -> x in 100f..1045f && y in 50f..155f
-        CardLayout.ROUTE -> false
+        CardLayout.STAT -> x in 70f..1020f && y in 1080f..1300f
+        CardLayout.ROUTE -> x in 70f..1030f && y in 265f..370f
     }
     if (draft.showPlace && titleArea) return true
     val labelArea = when (draft.layout) {
@@ -131,8 +136,9 @@ private fun isTemplateElementAt(position: Offset, width: Int, height: Int,
     if (draft.layout == CardLayout.SPLIT && y in 175f..275f &&
         (x in 55f..180f || x in 900f..1025f)) return true
     val metricArea = when (draft.layout) {
-        CardLayout.PHOTO, CardLayout.ROUTE -> x in 35f..1045f && y in 1160f..1370f
-        CardLayout.STAT -> x in 35f..1045f && y in 910f..1360f
+        CardLayout.PHOTO -> x in 35f..1045f && y in 1160f..1370f
+        CardLayout.ROUTE -> x in 60f..850f && y in 1200f..1370f
+        CardLayout.STAT -> x in 60f..1045f && y in 130f..470f
         CardLayout.JOURNAL, CardLayout.SPLIT -> x in 35f..1045f && y in 1200f..1360f
     }
     if (metricArea) return true
@@ -140,7 +146,7 @@ private fun isTemplateElementAt(position: Offset, width: Int, height: Int,
     return when (draft.layout) {
         CardLayout.PHOTO -> false
         CardLayout.JOURNAL, CardLayout.SPLIT, CardLayout.STAT -> false
-        CardLayout.ROUTE -> x in 100f..980f && y in 300f..1020f
+        CardLayout.ROUTE -> x in 120f..960f && y in 500f..980f
     }
 }
 

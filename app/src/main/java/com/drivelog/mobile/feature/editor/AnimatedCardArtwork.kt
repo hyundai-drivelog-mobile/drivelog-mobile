@@ -40,7 +40,7 @@ import org.json.JSONObject
 
 internal fun CardDraft.animatedPreviewSettings(record: RecordDto): JSONObject = toSettings().apply {
     if (layout == CardLayout.ROUTE && showRoute && cardMapPoints(record, trimEnds).size >= 2)
-        put("showRoute", false)
+        put("previewHideRouteStroke", true)
     if (layout == CardLayout.SPLIT) put("previewHideFrameCorners", true)
 }
 
@@ -51,9 +51,9 @@ internal data class CardPreview(val layout: CardLayout, val image: ImageBitmap,
 internal fun popupLayer(bitmap: Bitmap, layout: CardLayout, index: Int): PopupLayer {
     val regions = when (layout) {
         CardLayout.STAT -> listOf(
-            intArrayOf(350, 35, 1060, 155),
-            intArrayOf(140, 990, 1030, 1145),
-            intArrayOf(140, 1200, 1030, 1315),
+            intArrayOf(65, 115, 1060, 470),
+            intArrayOf(70, 485, 1040, 655),
+            intArrayOf(70, 1085, 1050, 1290),
         )
         CardLayout.JOURNAL -> listOf(
             intArrayOf(40, 625, 650, 800),
@@ -169,9 +169,9 @@ private fun projectCardRoute(points: List<com.drivelog.mobile.data.RoutePoint>):
     val minY = ys.min()
     val dx = (xs.max() - minX).coerceAtLeast(1e-7)
     val dy = (ys.max() - minY).coerceAtLeast(1e-7)
-    val scale = minOf(880.0 / dx, 700.0 / dy)
-    val ox = 100.0 + (880.0 - dx * scale) / 2
-    val oy = 300.0 + (700.0 - dy * scale) / 2
+    val scale = minOf(780.0 / dx, 315.0 / dy)
+    val ox = 150.0 + (780.0 - dx * scale) / 2
+    val oy = 535.0 + (315.0 - dy * scale) / 2
     return smoothRoute(points.indices.map { index ->
         Offset((ox + (xs[index] - minX) * scale).toFloat(),
             (oy + (ys[index] - minY) * scale).toFloat())
